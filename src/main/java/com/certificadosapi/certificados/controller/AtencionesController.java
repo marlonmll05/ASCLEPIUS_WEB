@@ -6,7 +6,7 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
-
+import org.springframework.boot.autoconfigure.integration.IntegrationAutoConfiguration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -303,6 +303,16 @@ public class AtencionesController {
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("application/zip"))
                 .body(zipBytes);
+    }
+
+    //ENDPOINT PARA EXPORTAR EXCEL SEGUN LA CUENTA DE COBRO
+    @GetMapping("/exportar-excel")
+    public ResponseEntity<List<Map<String, Object>>> exportarExcelCC(@RequestParam Integer idCC) throws SQLException{
+
+        List<Map<String, Object>> ccList = exportarService.exportarExcelCC(idCC);
+
+        return ResponseEntity.ok().body(ccList);
+        
     }
 
 }

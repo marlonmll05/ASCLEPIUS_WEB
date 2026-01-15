@@ -68,7 +68,7 @@ public class LoginsqlService {
 
         log.info("Intentando inicio de sesión en SQL Server");
 
-        String usuario = datos.get("username");
+        String usuario = datos.get("username").toLowerCase();
         String password = datos.get("password");
 
         if (!usuario.equals("angel")){

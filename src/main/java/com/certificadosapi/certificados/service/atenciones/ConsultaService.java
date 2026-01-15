@@ -9,6 +9,7 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +38,7 @@ public class ConsultaService {
 
     private static final Logger log = LoggerFactory.getLogger(ConsultaService.class);
 
-    private DatabaseConfig databaseConfig;
+    private final DatabaseConfig databaseConfig;
 
     @Autowired
     public ConsultaService(DatabaseConfig databaseConfig){
@@ -203,4 +204,6 @@ public class ConsultaService {
             }
         }
     } 
+
+
 }

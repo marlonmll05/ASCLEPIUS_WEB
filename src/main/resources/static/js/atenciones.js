@@ -239,6 +239,100 @@ function showModalGuardar(message) {
 }
 
 
+async function descargarExcel() {
+    const cuentaCobroInput = document.getElementById('cuentaCobro');
+    const idCC = cuentaCobroInput.value.trim();
+    
+    // Validar que se haya ingresado un número de cuenta de cobro
+    if (!idCC) {
+        alert('Por favor ingrese un número de cuenta de cobro');
+        return;
+    }
+    
+    // Validar que sea un número
+    if (isNaN(idCC)) {
+        alert('El número de cuenta de cobro debe ser un valor numérico');
+        return;
+    }
+    
+    const btnExportar = document.getElementById('btnExportarExcel');
+    const textoOriginal = btnExportar.textContent;
+    
+    try {
+        // Deshabilitar botón y mostrar estado de carga
+        btnExportar.disabled = true;
+        btnExportar.textContent = 'Descargando...';
+        
+        const url = `https://${host}:9876/api/exportar-excel?idCC=${idCC}`;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`Error en la solicitud: ${response.status} - ${await response.text()}`);
+        }
+        
+        const data = await response.json();
+        
+        // Validar que haya datos
+        if (!data || data.length === 0) {
+            alert('No se encontraron registros para esta cuenta de cobro');
+            return;
+        }
+        
+        // Crear el libro de Excel
+        const workbook = XLSX.utils.book_new();
+        
+        // Convertir los datos a hoja de cálculo
+        const worksheet = XLSX.utils.json_to_sheet(data);
+
+        const range = XLSX.utils.decode_range(worksheet['!ref']);
+        
+        for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+            // Columna TotalFactura (columna D, índice 3)
+            const cellTotalFactura = XLSX.utils.encode_cell({ r: R, c: 3 });
+            if (worksheet[cellTotalFactura]) {
+                worksheet[cellTotalFactura].z = '#,##0.00';  // Formato con 2 decimales
+                worksheet[cellTotalFactura].t = 'n';  // Tipo numérico
+            }
+            
+            // Columna Copago (columna E, índice 4)
+            const cellCopago = XLSX.utils.encode_cell({ r: R, c: 4 });
+            if (worksheet[cellCopago]) {
+                worksheet[cellCopago].z = '#,##0.000';  // Formato con 3 decimales
+                worksheet[cellCopago].t = 'n';  // Tipo numérico
+            }
+        }
+        
+        // Ajustar anchos de columna (opcional)
+        const columnWidths = [
+            { wch: 12 }, // IdAtencion
+            { wch: 15 }, // NFact
+            { wch: 15 }, // FechaFactura
+            { wch: 15 }, // TotalFactura
+            { wch: 12 }, // Copago
+            { wch: 30 }, // Nombre
+            { wch: 10 }  // IdCC
+        ];
+        worksheet['!cols'] = columnWidths;
+        
+        // Agregar la hoja al libro
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Detalle Factura CC');
+        
+        // Generar el archivo y descargarlo
+        const nombreArchivo = `Detalle_CC_${idCC}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(workbook, nombreArchivo);
+        
+        console.log(`Excel descargado exitosamente: ${nombreArchivo}`);
+        
+    } catch (error) {
+        console.error('Error al descargar Excel:', error);
+        alert('Error al generar el archivo Excel. Por favor intente nuevamente.');
+    } finally {
+        btnExportar.disabled = false;
+        btnExportar.textContent = textoOriginal;
+    }
+}
+
+
 // ============================================
 // GESTIÓN DE SELECTS Y FORMULARIOS
 // ============================================
@@ -289,7 +383,7 @@ async function poblarSelect(selectId, idTabla, id, valueField, textField) {
     select.querySelectorAll("option:not([value=''])").forEach(opt => opt.remove());
     const errorOpt = document.createElement("option");
     errorOpt.value = "";
-    errorOpt.textContent = "❌ Error al cargar";
+    errorOpt.textContent = "⚠ Error al cargar";
     select.appendChild(errorOpt);
     }
 }
@@ -1373,7 +1467,7 @@ document.getElementById('btnExportar').addEventListener('click', async (event) =
                         console.log(`Recopilando admisión: ${idAdmision}, nFact: ${nFact}`);
 
                         if (!nFact) {
-                            console.warn(`❌ La fila ${idAdmision} no tiene NFact; se omite.`);
+                            console.warn(`⚠ La fila ${idAdmision} no tiene NFact; se omite.`);
                             return;
                         }
 
@@ -1393,11 +1487,11 @@ document.getElementById('btnExportar').addEventListener('click', async (event) =
 
                                         formFinal.append(`${nFact}_xml`, new File([blobXml], filenameXml, { type: 'application/xml' }));
                                     } else {
-                                        console.warn(`❌ Sin XML para factura ${nFact} - SE OMITE FACTURA COMPLETA`);
+                                        console.warn(`⚠ Sin XML para factura ${nFact} - SE OMITE FACTURA COMPLETA`);
                                         return; 
                                     }
                                 } catch (err) {
-                                    console.error(`❌ Error descargando XML para ${nFact} - SE OMITE FACTURA:`, err);
+                                    console.error(`⚠ Error descargando XML para ${nFact} - SE OMITE FACTURA:`, err);
                                     return;
                                 }
 
@@ -1413,15 +1507,15 @@ document.getElementById('btnExportar').addEventListener('click', async (event) =
                                             formFinal.append(`${nFact}_jsonFactura`, new File([blobJson], filenameJson, { type: 'application/json' }));
 
                                         } else {
-                                            console.warn(`❌ Sin JSON para factura ${nFact} - SE OMITE FACTURA COMPLETA`);
+                                            console.warn(`⚠ Sin JSON para factura ${nFact} - SE OMITE FACTURA COMPLETA`);
                                             return; 
                                         }
                                     } catch (err) {
-                                        console.error(`❌ Error descargando JSON para ${nFact} - SE OMITE FACTURA:`, err);
+                                        console.error(`⚠ Error descargando JSON para ${nFact} - SE OMITE FACTURA:`, err);
                                         return;
                                     }
                                 } else {
-                                    console.warn(`❌ Sin idMovDoc para factura ${nFact} - SE OMITE FACTURA COMPLETA`);
+                                    console.warn(`⚠ Sin idMovDoc para factura ${nFact} - SE OMITE FACTURA COMPLETA`);
                                     return;
                                 }
                             }
@@ -1431,9 +1525,9 @@ document.getElementById('btnExportar').addEventListener('click', async (event) =
                                 const respSoporte = await fetch(`https://${host}:9876/api/soportes-por-anexos?idAdmision=${idAdmision}`);
 
                                 if (respSoporte.status === 204) {
-                                    console.warn(`⚠️ Sin PDFs para IdAtencion ${idAtencion}`);
+                                    console.warn(`⚠ Sin PDFs para IdAtencion ${idAtencion}`);
                                 } else if (!respSoporte.ok) {
-                                    console.warn(`⚠️ Error obteniendo soportes:`, await respSoporte.text());
+                                    console.warn(`⚠ Error obteniendo soportes:`, await respSoporte.text());
                                 } else {
                                     const soportes = await respSoporte.json();
                                     
@@ -1453,7 +1547,7 @@ document.getElementById('btnExportar').addEventListener('click', async (event) =
 
                                             return { blob, nombre, nFact };
                                         } catch (err) {
-                                            console.error(`⚠️ Error descargando PDF ${idSoporteKey}:`, err);
+                                            console.error(`⚠ Error descargando PDF ${idSoporteKey}:`, err);
                                             return null;
                                         }
                                     });
@@ -1464,13 +1558,13 @@ document.getElementById('btnExportar').addEventListener('click', async (event) =
                                     });
                                 }
                             } catch (err) {
-                                console.error(`⚠️ Error listando soportes:`, err);
+                                console.error(`⚠ Error listando soportes:`, err);
                             }
 
-                            console.log(`✅ Factura ${nFact} procesada correctamente`);
+                            console.log(`✔ Factura ${nFact} procesada correctamente`);
 
                         } catch (err) {
-                            console.error(`❌ Error procesando admisión ${idAdmision}:`, err);
+                            console.error(`⚠ Error procesando admisión ${idAdmision}:`, err);
                         }
                     }));
 
@@ -1479,7 +1573,7 @@ document.getElementById('btnExportar').addEventListener('click', async (event) =
                     const porcentaje = Math.round((filasProces / totalFilas) * 90);
                     actualizarToastProgreso(toast, porcentaje);
                     
-                    console.log(`✅ Lote completado. Progreso: ${filasProces}/${totalFilas} (${porcentaje}%)`);
+                    console.log(`✔ Lote completado. Progreso: ${filasProces}/${totalFilas} (${porcentaje}%)`);
                 }
 
                 toast.querySelector("p").textContent = "Generando archivo ZIP...";
@@ -1786,12 +1880,12 @@ tabla.addEventListener('click', async (e) => {
         if (!insertResp.ok) throw new Error(await insertResp.text());
 
         actualizarToastProgreso(toastDiag, 100);
-        toastDiag.querySelector("p").textContent = "Documento diagnóstico generado ✅";
+        toastDiag.querySelector("p").textContent = "Documento diagnóstico generado ✔";
         toastDiag.classList.replace("info", "success");
     } catch (err1) {
         console.error("Error en apoyo diagnóstico:", err1);
         actualizarToastProgreso(toastDiag, 100);
-        toastDiag.querySelector("p").textContent = "❌ Error en apoyo diagnóstico";
+        toastDiag.querySelector("p").textContent = "⚠ Error en apoyo diagnóstico";
         toastDiag.classList.replace("info", "error");
     } finally {
         setTimeout(() => {
@@ -1825,14 +1919,14 @@ tabla.addEventListener('click', async (e) => {
         throw new Error(errorText);
         }
 
-        console.log("✅ Factura generada correctamente");
+        console.log("✔ Factura generada correctamente");
         actualizarToastProgreso(toastFactura, 100);
-        toastFactura.querySelector("p").textContent = "Factura generada ✅";
+        toastFactura.querySelector("p").textContent = "Factura generada ✔";
         toastFactura.classList.replace("info", "success");
     } catch (errFactura) {
         console.error("Error al generar factura:", errFactura);
         actualizarToastProgreso(toastFactura, 100);
-        toastFactura.querySelector("p").textContent = "❌ Error en factura";
+        toastFactura.querySelector("p").textContent = "⚠ Error en factura";
         toastFactura.classList.replace("info", "error");
     } finally {
         setTimeout(() => {
@@ -1867,7 +1961,7 @@ tabla.addEventListener('click', async (e) => {
         const { Id: idSoporteKey, nombreRptService: nombreSoporte, TipoDocumento: tipoDocumento } = soporte;
         
         if (!nombreSoporte || nombreSoporte.trim() === "") {
-            console.warn("⚠️ Soporte omitido: nombreSoporte vacío");
+            console.warn("⚠ Soporte omitido: nombreSoporte vacío");
             procesados++;
             continue;
         }
@@ -1896,7 +1990,7 @@ tabla.addEventListener('click', async (e) => {
             }
 
             actualizarToastProgreso(toastSoporte, 100);
-            toastSoporte.querySelector("p").textContent = `Soporte ${idSoporteKey} completado ✅`;
+            toastSoporte.querySelector("p").textContent = `Soporte ${idSoporteKey} completado ✔`;
             toastSoporte.classList.replace("info", "success");
         } catch (errIter) {
             console.error("Error en soporte:", errIter);
@@ -1922,7 +2016,7 @@ tabla.addEventListener('click', async (e) => {
 
     // ===== Final =====
     actualizarToastProgreso(toastProceso, 100);
-    toastProceso.querySelector("p").textContent = "Proceso completo ✅";
+    toastProceso.querySelector("p").textContent = "Proceso completo ✔";
     toastProceso.classList.replace("info", "success");
 
     setTimeout(() => {

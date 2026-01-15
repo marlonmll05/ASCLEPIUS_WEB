@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -11,6 +12,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -57,6 +59,38 @@ public class ExportarService {
     public ExportarService(DatabaseConfig databaseConfig){
         this.databaseConfig = databaseConfig;
     }
+
+
+    public List<Map<String, Object>> exportarExcelCC(Integer idCC) throws SQLException {
+        try (Connection conn = DriverManager.getConnection(databaseConfig.getConnectionUrl("IPSoft100_ST"))) {
+            String sql = "EXEC Pa_Factura_CC_Detalle ?";
+            try (CallableStatement cStatement = conn.prepareCall(sql)) {
+                cStatement.setInt(1, idCC);
+                
+                List<Map<String, Object>> resultados = new ArrayList<>();
+                
+                try (ResultSet rs = cStatement.executeQuery()) {
+                    while (rs.next()) {
+                        Map<String, Object> fila = new LinkedHashMap<>();
+                        fila.put("IdAtencion", rs.getInt("IdAtencion"));
+                        fila.put("NFact", rs.getString("NFact"));
+                        fila.put("FechaFactura", rs.getDate("FechaFactura"));
+                        fila.put("TotalFactura", rs.getBigDecimal("TotalFactura"));
+                        fila.put("Copago", rs.getBigDecimal("Copago"));
+                        fila.put("Nombre", rs.getString("Nombre"));
+                        fila.put("IdCC", rs.getInt("IdCC"));
+                        
+                        resultados.add(fila);
+                    }
+                }
+                
+                log.info("Resultados detalle Factura CC - Total registros: {}", resultados.size());
+                
+                return resultados;
+            }
+        }
+    }
+
 
     /**
      * Exporta el contenido PDF asociado a una admisión y un soporte específico.

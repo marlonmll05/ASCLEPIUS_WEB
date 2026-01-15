@@ -479,7 +479,7 @@ async function descargarSeleccionados() {
             const id = cb.value;
             
             if (!nfact) {
-                reporte.push(`❌ ID ${id}: ERROR - Nfact no encontrado`);
+                reporte.push(`⚠ ID ${id}: ERROR - Nfact no encontrado`);
                 reporte.push('');
                 showToast('Error', `Nfact no encontrado para ID ${id}`, 'error');
                 erroresRips.push(id); // Contar como error
@@ -495,7 +495,7 @@ async function descargarSeleccionados() {
             
             if (ripsError) {
                 erroresRips.push(doc.id);
-                reporte.push(`❌ ${doc.nfact}: ERROR RIPS`);
+                reporte.push(`⚠ ${doc.nfact}: ERROR RIPS`);
                 reporte.push(`   Detalle: ${ripsError}`);
                 reporte.push('');
             }
@@ -515,7 +515,7 @@ async function descargarSeleccionados() {
 
         // Verificar si hay documentos válidos
         if (documentosValidos.length === 0) {
-            reporte.push('❌ PROCESO FINALIZADO: Ningún documento pasó la validación RIPS');
+            reporte.push('⚠ PROCESO FINALIZADO: Ningún documento pasó la validación RIPS');
             await guardarReporte(directoryHandle, reporte);
             
             showToast('Error', 'Ningún documento pasó validación RIPS. Se generó reporte con detalles.', 'error', 8000);
@@ -540,7 +540,7 @@ async function descargarSeleccionados() {
             
             if (downloadResult) {
                 erroresDescarga.push(doc.nfact);
-                reporte.push(`❌ ${doc.nfact}: ERROR EN DESCARGA`);
+                reporte.push(`⚠ ${doc.nfact}: ERROR EN DESCARGA`);
                 reporte.push(`   Detalle: ${downloadResult}`);
                 reporte.push('');
             } else {
@@ -562,8 +562,8 @@ async function descargarSeleccionados() {
         reporte.push('='.repeat(80));
         reporte.push(`Total procesados: ${seleccionados.length}`);
         reporte.push(`✓ Exitosos: ${exitosos.length}`);
-        reporte.push(`❌ Fallidos (RIPS): ${erroresRips.length}`);
-        reporte.push(`❌ Fallidos (Descarga): ${erroresDescarga.length}`);
+        reporte.push(`⚠ Fallidos (RIPS): ${erroresRips.length}`);
+        reporte.push(`⚠ Fallidos (Descarga): ${erroresDescarga.length}`);
         reporte.push(`Total errores: ${totalErrores}`);
         reporte.push('='.repeat(80));
 
@@ -585,7 +585,7 @@ async function descargarSeleccionados() {
         } else if (exitosos.length > 0) {
             showToast(
                 'Completado con errores', 
-                `✓ ${exitosos.length} exitosos | ❌ ${totalErrores} fallidos. Ver reporte_descarga.txt para detalles.`,
+                `✓ ${exitosos.length} exitosos | ⚠ ${totalErrores} fallidos. Ver reporte_descarga.txt para detalles.`,
                 'warning',
                 10000
             );
@@ -662,15 +662,15 @@ async function agregarCUVCompleto(nFact, cuv, idEstadoValidacion) {
         const agregarResponse = await fetch(urlAgregar, { method: 'POST' });
         if (agregarResponse.ok) {
         if (cuv) {
-            console.log(`✅ CUV agregado en Factura Final para NFact ${nFact}`);
+            console.log(`✔ CUV agregado en Factura Final para NFact ${nFact}`);
             }
             agregadoExitoso = true;
         } else {
-            console.error('❌ Error al agregar CUV para Factura Final');
+            console.error('⚠ Error al agregar CUV para Factura Final');
             return false;
         }
     } catch (error) {
-        console.error('❌ Error en la solicitud agregarcuv:', error);
+        console.error('⚠ Error en la solicitud agregarcuv:', error);
         return false;
     }
 
@@ -692,15 +692,15 @@ async function agregarCUVCompleto(nFact, cuv, idEstadoValidacion) {
             });
             if (actualizarResponse.ok) {
             if (cuv) {
-                console.log(`✅ CUV agregado en Rips_Transaccion para NFact ${nFact} (Estado: ${idEstadoValidacion})`);
+                console.log(`✔ CUV agregado en Rips_Transaccion para NFact ${nFact} (Estado: ${idEstadoValidacion})`);
             }
             } else {
                 const errorText = await actualizarResponse.text();
-                console.error('❌ Error al agregar CUV en Rips_Transaccion:', errorText);
+                console.error('⚠ Error al agregar CUV en Rips_Transaccion:', errorText);
 
             }
         } catch (error) {
-            console.error('❌ Error en la solicitud agregarcuvrips:', error);
+            console.error('⚠ Error en la solicitud agregarcuvrips:', error);
         
         }
     }
