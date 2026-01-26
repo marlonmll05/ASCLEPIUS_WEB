@@ -98,15 +98,19 @@ public class ValidadorService {
             return respuesta.getBody();
 
         } catch (HttpStatusCodeException ex) {
-            log.error("Error HTTP al enviar JSON para NFact={} Detalle={}", nFact, ex.getResponseBodyAsString());
-            throw new RuntimeException("Error en login: " + ex.getResponseBodyAsString(), ex);
+            
+            log.warn("Respuesta con error HTTP para NFact={} Status={} Body={}", 
+                    nFact, ex.getStatusCode(), ex.getResponseBodyAsString());
+            
+            return ex.getResponseBodyAsString();
 
         } catch (Exception e) {
             log.error("Error inesperado al enviar archivo JSON para NFact={} Error={}", nFact, e.getMessage());
-            throw new RuntimeException("Error en la solicitud de login: " + e.getMessage(), e);
+            
+    
+            throw new RuntimeException("Error en la solicitud al ministerio: " + e.getMessage(), e);
         }
     }
-
 
     /**
      * Obtiene el IdTipoCapita asociado a un número de factura desde la base de datos.
