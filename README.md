@@ -1,186 +1,200 @@
-# Validar, Consultar o Generar Facturas y Documentos de Soporte
+# ASCLEPIUS WEB
 
-Aplicación diseñada exclusivamente para los centros de salud del departamento del Atlántico, Colombia.
+Sistema web integral para la validación, generación y gestión de facturas y documentos de soporte de cobro en instituciones de salud del departamento del Atlántico, Colombia.
 
----
+Actualmente en producción en 18 centros de salud con más de 50 usuarios activos.
 
-## Funcionamiento General
+## Características Principales
 
-La aplicación cuenta con dos opciones principales, accesibles desde la página de inicio:
+### Gestión de Facturas
+- Consulta avanzada de facturas con múltiples filtros
+- Descarga individual o masiva (JSON, XML, CUV)
+- Visualización de detalles: paciente, usuario generador, CUV
+- Registro manual de CUV para facturas validadas localmente
+- Generación de reportes de éxito y errores
+- Acceso directo a documentos de soporte
 
-## 1. Consulta y Descarga de Facturas
-En esta sección, el usuario puede:
+### Validación con DIAN
+- Integración con API Docker SISPRO para validación en tiempo real
+- Validación individual o por lotes
+- Detección automática de errores con feedback inmediato
+- Editor integrado de JSON para corrección de errores
+- Almacenamiento automático de CUV en base de datos
+- Descarga completa de documentos validados
 
--Consultar todas las facturas registradas según diferentes filtros.
+### Gestión de Documentos de Soporte
+- Consulta con filtros avanzados (atención, EPS, contrato, fechas, etc.)
+- Generación automática según tipo de atención (epicrisis, resumen, procedimientos)
+- Anexado de documentos adicionales por registro de atención
+- Exportación individual, masiva o por cuenta de cobro
+- Visualización y eliminación de documentos asociados
+- Validación de cuentas de cobro con reporte de errores
+- Descarga selectiva (solo soportes o paquete completo)
 
--Descargar las facturas de forma individual o masiva.
+## Stack Tecnológico
 
--Las facturas descargadas incluyen JSON, XML si se selecciona la opcion y CUV si la factura ya ha sido validada.
+**Backend:**
+- Java 21
+- Spring Boot 3.4.3
+- SQL Server 2008+
+- REST APIs
+- Maven
 
--Visualizar detalles relevantes como:
+**Frontend:**
+- JavaScript (ES6+)
+- HTML5
+- CSS3
 
--Nombre del paciente.
+**DevOps & Integración:**
+- Docker (API SISPRO)
+- HTTPS/SSL
+- Git
 
--Usuario que generó la factura.
+**Seguridad:**
+- Conexión HTTPS con certificado SSL
+- Autenticación mediante credenciales SQL con token secreto
+- Puerto seguro: 9876
 
--CUV devuelto por la DIAN.
+## Impacto
 
--Añadir CUV manualmente en caso de que la factura haya sido validada localmente.
+- 18 centros de salud activos
+- 50+ usuarios diarios
+- 80% de reducción en tiempos de validación
+- 20+ tipos de documentos gestionados
+- 12 meses de desarrollo
 
--Descargar un reporte de las facturas descargadas exitosamente y las que presentan errores
+## Instituciones en Producción
 
--Acceso directo al documento de soporte de cada factura.
+1. Prosalud S.A.S (Sabanalarga)
+2. Hospital de Santo Tomás
+3. Hospital de Galapa
+4. Clínica Santa Ana de Baranoa
+5. Hospital Materno Infantil de Soledad
+6. Hospital de Juan de Acosta
+7. Hospital de Manatí
+8. ESE Ana Maria Rodriguez, Fundación
+9. Hospital de Usiacurí
+10. Hospital de Ponedera
+11. ESE Unidad Local Salud de Suan
+12. Hospital de Luruaco
+13. Hospital de Sabanagrande
+14. Hospital de Palmar de Varela
+15. Hospital de Polonuevo
+16. Sanidad IPS
+17. Hospital Campo de la Cruz
+18. Hospital Juan de Acosta
 
-Además, en el apartado del documento de soporte, el usuario puede seleccionar qué tipo de historia clínica desea descargar, según el caso:
-Epicrisis, resumen de atención, procedimientos de apoyo diagnóstico, entre otros.
+## Módulos Principales
 
+**Módulo de Facturación:**
+- Consulta con filtros dinámicos
+- Generación de JSON estructurado
+- Descarga individual y masiva
+- Gestión de CUV
 
-## 2. Validación de Facturas con la DIAN
-Esta sección, permite validar las facturas electrónicas utilizando una API Docker provista por SISPRO. Para poder conectarse es necesario contar con un usuario y contraseña válidos.
+**Módulo de Validación DIAN:**
+- Conexión con API Docker SISPRO
+- Validación en tiempo real
+- Procesamiento por lotes
+- Manejo de errores y reintentos
 
-Una vez autenticado, el usuario puede aplicar filtros para listar facturas pendientes de validación. A partir de allí:
+**Módulo de Documentos de Soporte:**
+- Generación automática de 20+ tipos de PDF
+- Clasificación por tipificación
+- Exportación flexible
+- Control de versiones
 
--Las facturas se pueden validar de forma individual o por grupos.
+## Requisitos del Sistema
 
--Si una factura presenta errores, la interfaz mostrará los detalles automáticamente.
+**Servidor:**
+- SO: Windows Server 2016+ o Linux (Ubuntu 20.04+)
+- Java: JDK 21+
+- Base de datos: SQL Server 2008 o superior
+- RAM: Mínimo 4GB (recomendado 8GB)
+- Almacenamiento: 8GB disponibles
 
--A través del botón “Ver JSON”, el usuario puede:
+**Cliente (Validación SISPRO):**
+- SO: Windows 10 versión 19045 o superior
+- Docker Desktop instalado y configurado
+- Conexión a red local del servidor
+- Certificado SSL instalado 
 
--Visualizar el contenido de la factura.
+**Red:**
+- Acceso: Red local (LAN/Wi-Fi)
+- Puerto: 9876 (HTTPS)
+- Protocolo: HTTPS con certificado válido
 
--Editar directamente los campos con errores.
+### 1. Despliegue
 
--Guardar los cambios y volver a validar.
+```bash
+# Compilar proyecto
+mvn clean package
 
--Si la factura es válida, el sistema devuelve el CUV correspondiente, que se almacena automáticamente en la base de datos.
+# Ejecutar aplicación
+java -jar gestion-hospitalaria.jar
+```
 
--Las facturas pueden descargarse e incluyen JSON, XML y CUV.
+### 2. Acceso
 
----
+```
+URL: https://[nombre-del-dominio]:9876/inicio.html
+```
 
-## 3. Gestionar Documentos Soporte
+## Funcionalidades Destacadas
 
-En esta sección, el usuario puede:
+**Automatización de Procesos:**
+- Validación masiva: Procesamiento por lotes de hasta 100 facturas simultáneas
+- Generación automática: Creación de documentos según tipo de atención
+- Reportes automáticos: Generación de informes de éxito y errores
 
-- Consultar documentos de soporte asociados a las atenciones médicas según diferentes filtros.
+**Cumplimiento Normativo:**
+- Alineado con resoluciones de la DIAN
+- Compatible con estándares SISPRO
+- Validación de RIPS según Ministerio de Salud
+- Facturación electrónica según normativa vigente
 
-- Filtrar por: registro de atención, historia clínica, EPS, contrato, área de atención, fechas, número de factura, cuenta de cobro y cantidad de soportes.
+**Trazabilidad:**
+- Registro de todas las operaciones por usuario
+- Historial completo de modificaciones
+- Seguimiento de errores y resoluciones
 
-- Visualizar detalles relevantes como:
-  - Estado de la atención
-  - Paciente y contrato asociado
-  - Número de factura generada
-  - Cantidad de documentos de soporte
+## Seguridad
 
-- Generar automáticamente documentos de soporte según el tipo de atención (epicrisis, resumen de atención, procedimientos, etc.).
+- **Cifrado:** Comunicación HTTPS con certificado SSL/TLS
+- **Autenticación:** Sistema de tokens secretos
+- **Autorización:** Control de acceso basado en roles
+- **Auditoría:** Registro de todas las acciones críticas
+- **Backup:** Respaldos automáticos diarios
 
-- Anexar documentos adicionales a cada registro de atención segun su ID.
+## Integraciones
 
-- Exportar documentos de forma individual o masiva.
+**APIs Gubernamentales:**
+- SISPRO: Sistema Integral de Información de la Protección Social
+- DIAN: Dirección de Impuestos y Aduanas Nacionales
 
-- Exportar por cuenta de cobro para facilitar la gestión administrativa.
-
-- Visualizar todos los documentos asociados a una atención específica y eliminarlos cuando sea necesario.
-
-- Validar Cuenta de Cobro y ver todas las atenciones que presentan errores en formato de reporte.
-
-- Seleccionar si descargar solo los soportes o incluir todo los archivos dentro del zip (JSON, XML, CUV y SOPORTES).
-
-
-## Requisitos Tecnicos
-
-Para utilizar el módulo de validación es necesario contar con un equipo con Windows 10 versión 19045 o superior.
-
-Importante: Algunos hospitales que no cuentan con un servidor actualizado han optado por usar equipos alternos exclusivamente para la instalación y ejecución de la API Docker.
-
----
-
-## Características Técnicas
-
-- **Arquitectura:** Cliente-servidor con API REST
-- **Base de datos:** [SQL SERVER 2008]
-- **Tecnologías utilizadas:** 
-  - Frontend: [HTML5, CSS3, JavaScript]
-  - Backend: [Java Spring Boot]
-  - Integración: API Docker SISPRO
-- **Seguridad:** 
-    - Conexión HTTPS con certificado SSL
-    - Autenticación mediante credenciales SQL con token secreto
-
-- **Puerto de acceso:** 9876
-
-
-## Ventajas del Sistema
-
-- **Automatización:** Reducción significativa de tiempo en la generación y validación de facturas electrónicas.
-- **Validación en tiempo real:** Corrección inmediata de errores antes del envío oficial a la DIAN.
-- **Trazabilidad completa:** Registro detallado de todas las operaciones realizadas por cada usuario.
-- **Gestión centralizada:** Control unificado de facturas y documentos de soporte desde una sola plataforma.
-- **Cumplimiento normativo:** Alineado con las exigencias de la DIAN y SISPRO para el sector salud.
-- **Exportación flexible:** Descarga individual o masiva según las necesidades del usuario.
-
-
-## Acceso a la Aplicación
-
-Para conectarse, es necesario cumplir con los siguientes requisitos:
-
-- Estar conectado a la **misma red Wi-Fi** del servidor.
-- Haber instalado el **certificado SSL** correspondiente.
-- Acceder mediante el protocolo **HTTPS** en el siguiente formato:
-
-https://[nombre-del-dominio]:9876/inicio.html
-
----
-
-## Tiempo de Desarrollo
-
-**11 meses aproximadamente.**
-
----
-
-## Entidades Donde Está en Funcionamiento
-
-Esta aplicación ha sido instalada y se encuentra actualmente en funcionamiento en:
-
-- Prosalud S.A.S (Sabanalarga)
-- Hospital de Santo Tomás
-- Hospital de Galapa
-- Clínica Santa Ana de Baranoa
-- Hospital Materno Infantil de Soledad
-- Hospital de Juan de Acosta
-- Hospital de Manatí
-- ESE Ana Maria Rodriguez, Fundacion
-- Hospital de Usiacurí
-- Hospital de Ponedera
-- ESE Unidad Local Salud de Suan
-- Hospital de Luruaco
-- Hospital de Sabanagrande
-- Hospital de Juan de Acosta
-- Hospital de Palmar de Varela
-- Hospital de Polonuevo
-- Sanidad IPS
-- Hospital Campo de la Cruz
-  
----
+**Formatos Soportados:**
+- JSON: Factura electrónica estructurada
+- XML: Documento fiscal estándar
+- PDF: Documentos de soporte múltiples
+- CUV: Código Único de Validación
 
 ## Soporte y Mantenimiento
 
-- **Actualizaciones:** El sistema recibe actualizaciones periódicas para mejoras y correcciones.
-- **Soporte técnico:** Atención personalizada disponible 6 días a la semana a través del correo marlonfadim@hotmail.com
-- **Tiempo de respuesta:** Atención prioritaria a incidencias críticas y soporte continuo durante el horario laboral.
-- **Capacitación:** Se ofrece capacitación inicial al personal de cada institución durante la implementación.
-- **Mantenimiento preventivo:** Monitoreo constante del sistema para garantizar su óptimo funcionamiento.
+**Servicios Incluidos:**
+- Actualizaciones periódicas: Mejoras y correcciones
+- Soporte técnico: 6 días a la semana
+- Tiempo de respuesta: Atención prioritaria a incidencias críticas
+- Capacitación inicial: Incluida en la implementación
+- Mantenimiento preventivo: Monitoreo constante
 
----
+**Contacto:**
+- Email: marlonfadim@hotmail.com
+- Horario: Lunes a Sábado, 8:00 AM - 6:00 PM
+- Emergencias críticas: Respuesta en menos de 30 minutos
 
 ## Autor
 
-**Creado y diseñado por:** Marlon Morales Llanos  
-**Empresa:** GIHOS S.A.S
-
-
-## Contacto
-
-Para mayor informacion escribirme al correo:
-**marlonfadim@hotmail.com**
-
+**Desarrollado por:** Marlon Morales Llanos  
+**Empresa:** GESTION INTEGRAL HOSPITALARIA S.A.S  
+**LinkedIn:** [linkedin.com/in/marlon-moralesll](https://linkedin.com/in/marlon-moralesll)  
+**GitHub:** [github.com/marlonmll05](https://github.com/marlonmll05)
