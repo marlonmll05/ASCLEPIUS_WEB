@@ -89,6 +89,7 @@ public class DatabaseConfig {
         dict.put(3, "FE_RS_UsuarioGen");
         dict.put(4, "FE_RS_UsuarioGenPwd");
         dict.put(5, "WCC_Online");
+        dict.put(6, "WALM_Online");
 
         String value = dict.get(option);
             

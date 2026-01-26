@@ -37,7 +37,7 @@
               Gestión de Rips
               <i data-lucide="chevron-down" class="dropdown-icon" style="width: 16px; height: 16px;"></i>
             </button>
-            <div class="dropdown-menu">
+            <div class="dropdown-menu dropdown-disabled">
               <a href="facturas.html" class="dropdown-item" id="menuRips">
                 <i data-lucide="file-text" class="dropdown-item-icon"></i>
                 <div class="dropdown-item-content">
@@ -57,7 +57,7 @@
         </nav>
 
         <nav class="nav-menu">
-          <div class="dropdown">
+          <div class="dropdown dropdown-disabled" data-module="soporte">
             <button class="dropdown-toggle">
               <i data-lucide="menu" style="width: 20px; height: 20px;"></i>
               Gestión de Documentos
@@ -76,7 +76,7 @@
         </nav>
 
         <nav class="nav-menu">
-          <div class="dropdown">
+          <div class="dropdown dropdown-disabled" data-module="cuenta">
             <button class="dropdown-toggle">
               <i data-lucide="menu" style="width: 20px; height: 20px;"></i>
               Cuentas de Cobro
@@ -90,6 +90,65 @@
                   <p>Consultar relacion de Cuenta de Cobro</p>
                 </div>
               </a>
+            </div>
+          </div>
+        </nav>
+
+        <nav class="nav-menu">
+          <div class="dropdown dropdown-disabled" data-module="almacen">
+            <button class="dropdown-toggle">
+              <i data-lucide="menu" style="width: 20px; height: 20px;"></i>
+              Sistema de Almacén
+              <i data-lucide="chevron-down" class="dropdown-icon" style="width: 16px; height: 16px;"></i>
+            </button>
+            <div class="dropdown-menu">
+              <a href="categorias.html" class="dropdown-item" id="menuCategorias">
+                <i data-lucide="edit-3" class="dropdown-item-icon"></i>
+                <div class="dropdown-item-content">
+                  <h3>Categorias</h3>
+                  <p>Consultar, crear o actualizar Categorias</p>
+                </div>
+              </a>
+
+              <a href="productos.html" class="dropdown-item" id="menuProductos">
+                <i data-lucide="edit-3" class="dropdown-item-icon"></i>
+                <div class="dropdown-item-content">
+                  <h3>Productos</h3>
+                  <p>Consultar, crear o actualizar Productos</p>
+                </div>
+              </a>
+
+              <a href="almacen.html" class="dropdown-item" id="menuEntrada">
+                <i data-lucide="edit-3" class="dropdown-item-icon"></i>
+                <div class="dropdown-item-content">
+                  <h3>Entradas</h3>
+                  <p>Consultar, crear o actualizar Entradas</p>
+                </div>
+              </a>
+              <a href="salida.html" class="dropdown-item" id="menuSalida">
+                <i data-lucide="edit-3" class="dropdown-item-icon"></i>
+                <div class="dropdown-item-content">
+                  <h3>Salidas</h3>
+                  <p>Consultar, crear o actualizar Salidas</p>
+                </div>
+              </a>
+
+              <a href="kardex.html" class="dropdown-item" id="menuKardex">
+                <i data-lucide="edit-3" class="dropdown-item-icon"></i>
+                <div class="dropdown-item-content">
+                  <h3>Kardex</h3>
+                  <p>Consultar, crear o actualizar Kardex</p>
+                </div>
+              </a>
+
+              <a href="existencia.html" class="dropdown-item" id="menuExistencia">
+                <i data-lucide="edit-3" class="dropdown-item-icon"></i>
+                <div class="dropdown-item-content">
+                  <h3>Existencias</h3>
+                  <p>Consultar, crear o actualizar Existencia</p>
+                </div>
+              </a>
+              
             </div>
           </div>
         </nav>

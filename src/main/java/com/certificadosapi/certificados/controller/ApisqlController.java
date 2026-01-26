@@ -52,6 +52,15 @@ public class ApisqlController {
         return ResponseEntity.ok(respuesta);
     }
 
+    //Metodo para verificar acceso al modulo de ALMACEN
+    @GetMapping("/validar-parametro-almacen")
+    public ResponseEntity<String> validarParametroAlmacen() throws SQLException{
+        
+        String respuesta = databaseConfig.parametrosServidor(6);
+
+        return ResponseEntity.ok(respuesta);
+    }
+
     //Metodo para iniciar sesion a la aplicacion web
     @PostMapping("/login")
     public ResponseEntity<?> iniciarSesion(@RequestBody Map<String, String> datos) throws SQLException {

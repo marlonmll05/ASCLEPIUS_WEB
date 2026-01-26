@@ -59,21 +59,11 @@ window.addEventListener("DOMContentLoaded", async () => {
   /* ===== VALIDAR ACCESO A SOPORTE ===== */
   try {
     const response = await fetch("/api/sql/validar-parametro-soporte");
-
-    if (!response.ok) {
-      console.log("Ocurrió un error", await response.text());
-      return;
-    }
-
-    const resultado = await response.text();
-
-    if (resultado !== "1") {
-      const atencionesLink = document.querySelector("#menuAtenciones");
-      if (atencionesLink) {
-        const dropdownAtenciones = atencionesLink.closest(".dropdown");
-        if (dropdownAtenciones) {
-          dropdownAtenciones.classList.add("dropdown-disabled");
-        }
+    if (response.ok) {
+      const resultado = await response.text(); 
+      if (resultado === "1") {
+        const dropdown = document.querySelector('[data-module="soporte"]');
+        if (dropdown) dropdown.classList.remove("dropdown-disabled");
       }
     }
   } catch (error) {
@@ -82,28 +72,33 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   /* ===== VALIDAR ACCESO A CUENTA COBRO ===== */
   try {
-    const responseCuenta = await fetch("/api/sql/validar-parametro-cuenta");
-
-    if (!responseCuenta.ok) {
-      console.log("Ocurrió un error", await responseCuenta.text());
-      return;
-    }
-
-    const resultadoCuenta = await responseCuenta.text();
-
-    if (resultadoCuenta !== "1") {
-      const cuentaCobroLink = document.querySelector("#menuCuentaCobro");
-      if (cuentaCobroLink) {
-        const dropdownCuentaCobro = cuentaCobroLink.closest(".dropdown");
-        if (dropdownCuentaCobro) {
-          dropdownCuentaCobro.classList.add("dropdown-disabled");
-        }
+    const response = await fetch("/api/sql/validar-parametro-cuenta");
+    if (response.ok) {
+      const resultado = await response.text();  
+      if (resultado === "1") {
+        const dropdown = document.querySelector('[data-module="cuenta"]');
+        if (dropdown) dropdown.classList.remove("dropdown-disabled");
       }
     }
   } catch (error) {
     console.error("Error al validar acceso a Cuenta Cobro", error);
   }
+
+  /* ===== VALIDAR ACCESO A ALMACEN ===== */
+  try {
+    const response = await fetch("/api/sql/validar-parametro-almacen");
+    if (response.ok) {
+      const resultado = await response.text(); 
+      if (resultado === "1") {
+        const dropdown = document.querySelector('[data-module="almacen"]');
+        if (dropdown) dropdown.classList.remove("dropdown-disabled");
+      }
+    }
+  } catch (error) {
+    console.error("Error al validar acceso a Almacen", error);
+  }
 });
+
 
 /**
  * Redirige al validador si existe una sesión activa,
