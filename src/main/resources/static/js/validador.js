@@ -1,3 +1,12 @@
+// ==========================================================
+// VALIDACIÓN Y CONFIGURACIÓN INICIAL
+// ==========================================================
+
+/**
+ * Valida los tokens de autenticación almacenados
+ * Redirige al login correspondiente si falta algún token
+ */
+
 const tokenSQL = localStorage.getItem('tokenSQL');
 const token = sessionStorage.getItem('token');
 
@@ -19,8 +28,22 @@ window.location.href = 'login.html';
 
 sessionStorage.setItem('pestanaActiva', 'true');
 
+// ==========================================================
+// VARIABLES GLOBALES
+// ==========================================================
 const host = window.location.hostname;
 
+
+// ==========================================================
+// INICIALIZACIÓN DEL DOM
+// ==========================================================
+
+/**
+ * Configura eventos y valores iniciales al cargar el documento
+ * - Establece fechas por defecto (hoy)
+ * - Carga terceros disponibles
+ * - Activa verificación de checkboxes
+ */
 document.addEventListener('DOMContentLoaded', () => {
     const fechaDesdeInput = document.getElementById('fechaDesde');
     const today = new Date().toISOString().split('T')[0];
@@ -39,8 +62,458 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-async function verJSON(idMovDoc) {
+// ==========================================================
+// EVENT LISTENERS
+// ==========================================================
+
+/**
+ * Maneja el envío del formulario de búsqueda de facturas
+ * Valida fechas, construye parámetros y muestra resultados en tabla
+ */
+document.getElementById('facturasForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    const submitBtn = e.submitter || document.querySelector('#facturasForm button[type="submit"]');
+    const originalHTML = submitBtn ? submitBtn.innerHTML : '';
     
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = 'Buscando...';
+        submitBtn.style.opacity = '0.6';
+        submitBtn.style.cursor = 'not-allowed';
+    }
+
+    try {
+        const fechaDesde = document.getElementById('fechaDesde').value;
+        const fechaHasta = document.getElementById('fechaHasta').value;
+        const tipoFechaCheckbox = document.getElementById('tipoFecha');
+
+
+        if (!fechaDesde) {
+            showToast('Error', 'La Fecha Desde es obligatoria.', 'error');
+            return;
+        }
+        if (!fechaHasta) {
+            showToast('Error', 'La Fecha Hasta es obligatoria.', 'error');
+            return;
+        }
+        if (new Date(fechaDesde) > new Date(fechaHasta)) {
+            showToast('Error', 'La Fecha Desde no puede ser mayor que la Fecha Hasta.', 'error');
+            return;
+        }
+
+        const formData = new FormData(e.target);
+        const params = new URLSearchParams();
+
+        params.append('tipoFecha', tipoFechaCheckbox.checked)
+
+        for (const [key, value] of formData.entries()) {
+            if (value.trim()) params.append(key, value);
+        }
+
+        showToast('Procesando', 'Buscando facturas...', 'success', 2000);
+
+        const response = await fetch(`/filtros/facturas?${params.toString()}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+            showToast('Error', typeof data === 'string' ? data : JSON.stringify(data), 'error');
+            return;
+        }
+
+        const head = document.getElementById('tablaHead');
+        const body = document.getElementById('tablaBody');
+        const accionesDiv = document.getElementById('accionesDiv');
+
+        accionesDiv.style.display = 'block';
+        head.innerHTML = '';
+        body.innerHTML = '';
+
+        if (data.length === 0) {
+            showToast('Error', 'No se encontraron resultados.', 'error')
+            body.innerHTML = `<tr><td colspan="10" class="empty-state">No se encontraron resultados</td></tr>`;
+            return;
+        }
+
+        const headers = Object.keys(data[0]).filter(h => h.toLowerCase() !== 'nomcontrato' && h.toLowerCase() !== 'idmovdoc' && h.toLowerCase() !== 'idtercerokey' && h.toLowerCase() !== 'nocontrato');
+        head.innerHTML = '<tr><th class="checkbox-cell"><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>' +
+            headers.map(h => `<th>${h}</th>`).join('') +
+            '<th class="col-descripcion">Descripción</th>' + 
+            '<th>Observaciones</th>' +
+            '<th>Estado</th>' +
+            '<th>CUV</th>' +
+            '<th class="accionis">Acciones</th></tr>';
+
+        const filasPromises = data.map(async (row, index) => {
+            const idMovDoc = row.idMovDoc || row.IdMovDoc || row.IDMOVDOC || row.ID || '';
+            const nFact = row.nFact || row.NFact || row.NFACT || row.NoFactura || '';
+            const rowCells = headers.map(h => `<td>${row[h] ?? ''}</td>`).join('');
+            const descripcion = row.descripcion || '';
+
+            const filaHTML = 
+            `<tr data-nfact="${nFact}">
+                <td class="checkbox-cell"><input type="checkbox" class="filaCheckbox custom-checkbox" value="${idMovDoc}"></td>
+                ${rowCells}
+                <td class="col-descripcion">${descripcion}</td>
+                <td>${row.observaciones || ''}</td>
+                <td class="estado-cell">${row.estado || 'Pendiente'}</td>
+                <td class="cuv-cell"></td>
+                <td>
+                <div class="button-flex">
+                    <button class="button button-small button-success" onclick="enviarPaquete('${idMovDoc}', this)">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 2L11 13" />
+                            <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+                        </svg>
+                        Enviar
+                    </button>
+                    <button class="button button-small button-success" onclick="DescargarPaquete(this)" data-id="${idMovDoc}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Descargar
+                        Paquete
+                    </button>
+                </div>
+                    <div style="display: flex; justify-content: center; align-items: center; gap: 16px; margin-top: 20px;">
+                    <button 
+                        class="button button-small" 
+                        onclick="verJSON('${idMovDoc}')" 
+                        style="display: flex; flex-direction: column; align-items: center; min-width: 88px; padding: 8px 12px;">
+                        <span>Ver</span>
+                        <span style="font-size: 13px;">JSON</span>
+                    </button>
+
+                    <button 
+                        class="button button-small descargar-logs-btn" 
+                        style="display: none; flex-direction: column; align-items: center; min-width: 88px; padding: 8px 18px;" 
+                        onclick="descargarLogsGenerales(this)">
+                        <span>Descargar</span>
+                        <span style="font-size: 13px;">Logs</span>
+                    </button>
+                    </div>
+                </td>
+            </tr>`;
+
+            return { html: filaHTML, nFact: nFact };
+        });
+
+        const filas = await Promise.all(filasPromises);
+        body.innerHTML = filas.map(f => f.html).join('');
+
+        const toast = showToast('Procesando', 'Cargando CUVs...', 'success', 999999, true);
+
+        await procesarFilasEnLotes(filas, body, 30, toast);
+
+        showToast('Búsqueda completada', `Se encontraron ${data.length} resultados`, 'success');
+
+    } catch (err) {
+        showToast('Error', "Error en la solicitud: " + err.message, 'error');
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalHTML;
+            submitBtn.style.opacity = '1';
+            submitBtn.style.cursor = 'pointer';
+        }
+    }
+});
+
+/**
+ * Carga contratos asociados al tercero seleccionado
+ * Se activa al cambiar el select de terceros
+ */
+
+document.getElementById('idTercero').addEventListener('change', async function () {
+    const idTerceroKey = this.value;
+    const selectContratos = document.getElementById('noContrato');
+    selectContratos.innerHTML = '<option value="">Seleccione un contrato</option>';
+
+    if (idTerceroKey) {
+        try {
+            const response = await fetch(`/filtros/contratos?idTerceroKey=${idTerceroKey}`);
+            const data = await response.json();
+
+            data.forEach(contrato => {
+                const option = document.createElement('option');
+                option.value = contrato.noContrato;
+                option.textContent = contrato.nomContrato;
+                selectContratos.appendChild(option);
+            });
+        } catch (error) {
+            console.error("Error al cargar contratos:", error);
+        }
+    }
+});
+
+
+/**
+ * Activa visualmente los botones de filtro por estado
+ * Remueve la clase 'activo' de otros botones al seleccionar uno
+ */
+document.querySelectorAll('.button-secondary').forEach(btn => {
+    btn.addEventListener('click', function () {
+
+        document.querySelectorAll('.button-secondary').forEach(b => b.classList.remove('activo'));
+
+        if (!this.textContent.toLowerCase().includes('deseleccionar')) {
+        this.classList.add('activo');
+        }
+    });
+});
+
+
+
+
+// ==========================================================
+// FUNCIONES DE GESTIÓN DE CUV
+// ==========================================================
+
+/**
+ * Procesa múltiples filas de facturas en lotes para cargar sus CUVs.
+ * Divide el procesamiento en grupos más pequeños para evitar sobrecarga del navegador.
+ * 
+ * @param {Array} filas - Array de objetos con datos de las facturas a procesar
+ * @param {HTMLElement} body - Elemento tbody de la tabla donde se mostrarán los resultados
+ * @param {number} [loteSize=30] - Tamaño del lote (cantidad de filas a procesar simultáneamente)
+ * @param {HTMLElement|null} [toast=null] - Elemento toast para mostrar el progreso de la operación
+ * @returns {Promise<void>}
+ */
+async function procesarFilasEnLotes(filas, body, loteSize = 30, toast = null) {
+    for (let i = 0; i < filas.length; i += loteSize) {
+        const lote = filas.slice(i, i + loteSize);
+        const promesas = lote.map(async (filaData, index) => {
+            const fila = body.children[i + index];
+            if (filaData.nFact) {
+                await actualizarCUVEnFila(fila, filaData.nFact);
+            } else {
+                const cuvCell = fila.querySelector('.cuv-cell');
+                const enviarBtn = fila.querySelector('button[onclick*="enviarPaquete"]');
+                if (cuvCell) cuvCell.innerHTML = '';
+                if (enviarBtn) {
+                    enviarBtn.disabled = false;
+                    enviarBtn.classList.remove('button-disabled');
+                }
+            }
+        });
+
+        await Promise.all(promesas);
+
+        if (toast) {
+            const progreso = Math.min(100, Math.round(((i + lote.length) / filas.length) * 100));
+            actualizarToastProgreso(toast, progreso);
+        }
+    }
+
+    if (toast) {
+        actualizarToastProgreso(toast, 100);
+        const mensaje = toast.querySelector('.toast-content p');
+        if (mensaje) mensaje.textContent = 'CUVs Cargados correctamente';
+
+        setTimeout(() => {
+            if (toast.parentElement) {
+                toast.classList.add('fadeOut');
+                setTimeout(() => toast.remove(), 300);
+            }
+        }, 3000); 
+    }
+}
+
+/**
+ * Obtiene el CUV de una factura desde el servidor
+ * @param {string} nFact - Número de factura
+ * @returns {Promise<string>} CUV o cadena vacía si no existe
+ */
+async function obtenerCUV(nFact) {
+    const host = window.location.hostname;
+    const url = `https://${host}:9876/api/sql/cuv?nFact=${nFact}`;
+    
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            return '';
+        }
+        const data = await response.json();
+        return data.Rips_CUV || '';
+    } catch (error) {
+        return '';
+    }
+}
+
+/**
+ * Actualiza el CUV en la fila de la tabla visual
+ * Agrega botón de copiar y cambia el estado visual
+ * @param {HTMLElement} fila - Elemento TR de la tabla
+ * @param {string} nFact - Número de factura
+ * @returns {Promise<void>}
+ */
+async function actualizarCUVEnFila(fila, nFact) {
+    const cuvCell = fila.querySelector('.cuv-cell');
+    if (cuvCell) {
+        const cuv = await obtenerCUV(nFact);
+
+        if (cuv && cuv.trim() !== '') {
+            cuvCell.innerHTML = `
+                <span class="valor-cuv">${cuv}</span>
+                <button class="btn-copiar-cuv" title="Copiar CUV" style="margin-left:5px; cursor:pointer;">📋</button>
+            `;
+
+            const copiarBtn = cuvCell.querySelector('.btn-copiar-cuv');
+            copiarBtn.addEventListener('click', () => {
+                copiarAlPortapapeles(cuv)
+                    .then(() => showToast('Copiado', `CUV copiado: ${cuv}`, 'success'))
+                    .catch(err => showToast('Error', 'No se pudo copiar el CUV', 'error'));
+                    
+            });
+            
+        } else {
+            cuvCell.innerHTML = '';
+        }
+
+        const enviarBtn = fila.querySelector('button[onclick*="enviarPaquete"]');
+        const estadoCell = fila.querySelector('.estado-cell');
+        fila.classList.remove('fila-verde');
+
+        if (cuv && cuv.trim() !== '') {
+            fila.classList.add('fila-verde');
+            if (enviarBtn) {
+                enviarBtn.disabled = true;
+                enviarBtn.classList.add('button-disabled');
+                enviarBtn.title = 'Ya enviado - CUV: ' + cuv;
+            }
+            if (estadoCell) {
+                estadoCell.textContent = 'Enviado';
+                estadoCell.classList.add('estado-verde');
+            }
+        } else {
+            if (enviarBtn) {
+                enviarBtn.disabled = false;
+                enviarBtn.classList.remove('button-disabled');
+                enviarBtn.title = 'Enviar paquete';
+            }
+        }
+    }
+}
+
+/**
+ * Agrega el CUV completo en Factura Final y Rips_Transaccion
+ * @param {string} nFact - Número de factura
+ * @param {string} cuv - Código Único de Validación
+ * @param {number} idEstadoValidacion - ID del estado (2=Editado, 3=Enviado, 4=Rechazado)
+ * @returns {Promise<boolean>} True si fue exitoso
+ */
+async function agregarCUVCompleto(nFact, cuv, idEstadoValidacion) {
+    let agregadoExitoso = false;
+    
+    const urlAgregar = `https://${host}:9876/api/sql/agregarcuv?nFact=${nFact}&ripsCuv=${cuv}`;
+    try {
+        const agregarResponse = await fetch(urlAgregar, { method: 'POST' });
+        if (agregarResponse.ok) {
+            console.log(`CUV agregado en Factura Final para NFact ${nFact}`);
+            agregadoExitoso = true;
+        } else {
+            console.error('⚠ Error al agregar CUV para Factura Final');
+            return false;
+        }
+    } catch (error) {
+        console.error('⚠ Error en la solicitud agregarcuv:', error);
+        return false;
+    }
+
+    if (agregadoExitoso) {
+        const urlActualizar = `https://${host}:9876/api/sql/actualizarcuvrips?nFact=${nFact}&cuv=${cuv}&idEstadoValidacion=${idEstadoValidacion}`;
+        try {
+            const actualizarResponse = await fetch(urlActualizar, { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (actualizarResponse.ok) {
+                console.log(`CUV agregado en Rips_Transaccion para NFact ${nFact} (Estado: ${idEstadoValidacion})`);
+            } else {
+                const errorText = await actualizarResponse.text();
+                console.error('⚠ Error al agregar CUV en Rips_Transaccion:', errorText);
+
+            }
+        } catch (error) {
+            console.error('⚠ Error en la solicitud agregarcuvrips:', error);
+
+        }
+    }
+
+    return agregadoExitoso;
+}
+
+/**
+ * Actualiza solo el estado de validación 
+ * @param {string} nFact - Número de factura
+ * @param {number} idEstadoValidacion - ID del estado (2=Editado, 3=Enviado, 4=Rechazado)
+ * @returns {Promise<boolean>} True si fue exitoso
+ */
+
+async function actualizarSoloEstado(nFact, idEstadoValidacion) {
+    try {
+        const urlActualizar = `https://${host}:9876/api/sql/actualizarcuvrips?nFact=${nFact}&cuv=&idEstadoValidacion=${idEstadoValidacion}`;
+        const response = await fetch(urlActualizar, { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            console.log(`Estado actualizado a ${idEstadoValidacion} para NFact ${nFact}`);
+            return true;
+        } else {
+            const errorText = await response.text();
+            console.error('⚠ Error al actualizar estado:', errorText);
+            return false;
+        }
+    } catch (error) {
+        console.error('⚠ Error en la solicitud de actualización de estado:', error);
+        return false;
+    }
+}
+
+/**
+ * Consulta el estado de validación actual de una factura
+ * @param {string} nFact - Número de factura
+ * @returns {Promise<number|null>} ID del estado o null si hay error
+ */
+
+async function obtenerEstadoValidacion(nFact) {
+    const host = window.location.hostname;
+    const url = `https://${host}:9876/api/sql/estadovalidacion?nFact=${nFact}`;
+    
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            console.error('Error al consultar estado de validación:', response.status);
+            return null;
+        }
+        const data = await response.json(); 
+        return data.idEstadoValidacion;
+    } catch (error) {
+        console.error('Error al obtener estado de validación:', error);
+        return null;
+    }
+}
+
+
+// ==========================================================
+// FUNCIONES DE VISUALIZACIÓN Y EDICIÓN DE JSON
+// ==========================================================
+
+/**
+ * Abre un modal para ver y editar el JSON de una factura
+ * Permite búsqueda, colapso de arrays grandes y edición de campos
+ * @param {string} idMovDoc - ID del movimiento/documento
+ * @returns {Promise<void>}
+ */
+async function verJSON(idMovDoc) { 
     const host = window.location.hostname;
     const button = document.querySelector(`button[onclick="verJSON('${idMovDoc}')"]`);
 
@@ -229,7 +702,7 @@ async function verJSON(idMovDoc) {
             delete window.cerrarModal;
             delete window.toggleArray;
             
-            console.log('✅ Limpieza de memoria completada');
+            console.log('Limpieza de memoria completada');
         }
 
         window.cerrarModal = function() {
@@ -648,7 +1121,7 @@ async function verJSON(idMovDoc) {
                     showToast('Error', `Error al guardar cambios: ${errorText}`, 'error');
                 }
             } catch (e) {
-                console.error("❌ Error en fetch:", e);
+                console.error("⚠ Error en fetch:", e);
                 showToast('Error', `Fallo la petición: ${e.message}`, 'error');
             }
         };
@@ -802,496 +1275,30 @@ async function verJSON(idMovDoc) {
     }
 }
 
-async function obtenerCUV(nFact) {
-    const host = window.location.hostname;
-    const url = `https://${host}:9876/api/sql/cuv?nFact=${nFact}`;
-    
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            return '';
-        }
-        const data = await response.json();
-        return data.Rips_CUV || '';
-    } catch (error) {
-        return '';
-    }
-}
 
-async function actualizarCUVEnFila(fila, nFact) {
-    const cuvCell = fila.querySelector('.cuv-cell');
-    if (cuvCell) {
-        const cuv = await obtenerCUV(nFact);
 
-        if (cuv && cuv.trim() !== '') {
-            cuvCell.innerHTML = `
-                <span class="valor-cuv">${cuv}</span>
-                <button class="btn-copiar-cuv" title="Copiar CUV" style="margin-left:5px; cursor:pointer;">📋</button>
-            `;
 
-            const copiarBtn = cuvCell.querySelector('.btn-copiar-cuv');
-            copiarBtn.addEventListener('click', () => {
-                copiarAlPortapapeles(cuv)
-                    .then(() => showToast('Copiado', `CUV copiado: ${cuv}`, 'success'))
-                    .catch(err => showToast('Error', 'No se pudo copiar el CUV', 'error'));
-                    
-            });
-            
-        } else {
-            cuvCell.innerHTML = '';
-        }
-
-        const enviarBtn = fila.querySelector('button[onclick*="enviarPaquete"]');
-        const estadoCell = fila.querySelector('.estado-cell');
-        fila.classList.remove('fila-verde');
-
-        if (cuv && cuv.trim() !== '') {
-            fila.classList.add('fila-verde');
-            if (enviarBtn) {
-                enviarBtn.disabled = true;
-                enviarBtn.classList.add('button-disabled');
-                enviarBtn.title = 'Ya enviado - CUV: ' + cuv;
-            }
-            if (estadoCell) {
-                estadoCell.textContent = 'Enviado';
-                estadoCell.classList.add('estado-verde');
-            }
-        } else {
-            if (enviarBtn) {
-                enviarBtn.disabled = false;
-                enviarBtn.classList.remove('button-disabled');
-                enviarBtn.title = 'Enviar paquete';
-            }
-        }
-    }
-}
-
-document.getElementById('facturasForm').addEventListener('submit', async function (e) {
-    e.preventDefault();
-
-    const submitBtn = e.submitter || document.querySelector('#facturasForm button[type="submit"]');
-    const originalHTML = submitBtn ? submitBtn.innerHTML : '';
-    
-    if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = 'Buscando...';
-        submitBtn.style.opacity = '0.6';
-        submitBtn.style.cursor = 'not-allowed';
-    }
-
-    try {
-        const fechaDesde = document.getElementById('fechaDesde').value;
-        const fechaHasta = document.getElementById('fechaHasta').value;
-        const tipoFechaCheckbox = document.getElementById('tipoFecha');
-
-
-        if (!fechaDesde) {
-            showToast('Error', 'La Fecha Desde es obligatoria.', 'error');
-            return;
-        }
-        if (!fechaHasta) {
-            showToast('Error', 'La Fecha Hasta es obligatoria.', 'error');
-            return;
-        }
-        if (new Date(fechaDesde) > new Date(fechaHasta)) {
-            showToast('Error', 'La Fecha Desde no puede ser mayor que la Fecha Hasta.', 'error');
-            return;
-        }
-
-        const formData = new FormData(e.target);
-        const params = new URLSearchParams();
-
-        params.append('tipoFecha', tipoFechaCheckbox.checked)
-
-        for (const [key, value] of formData.entries()) {
-            if (value.trim()) params.append(key, value);
-        }
-
-        showToast('Procesando', 'Buscando facturas...', 'success', 2000);
-
-        const response = await fetch(`/filtros/facturas?${params.toString()}`);
-        const data = await response.json();
-
-        if (!response.ok) {
-            showToast('Error', typeof data === 'string' ? data : JSON.stringify(data), 'error');
-            return;
-        }
-
-        const head = document.getElementById('tablaHead');
-        const body = document.getElementById('tablaBody');
-        const accionesDiv = document.getElementById('accionesDiv');
-
-        accionesDiv.style.display = 'block';
-        head.innerHTML = '';
-        body.innerHTML = '';
-
-        if (data.length === 0) {
-            showToast('Error', 'No se encontraron resultados.', 'error')
-            body.innerHTML = `<tr><td colspan="10" class="empty-state">No se encontraron resultados</td></tr>`;
-            return;
-        }
-
-        const headers = Object.keys(data[0]).filter(h => h.toLowerCase() !== 'nomcontrato' && h.toLowerCase() !== 'idmovdoc' && h.toLowerCase() !== 'idtercerokey' && h.toLowerCase() !== 'nocontrato');
-        head.innerHTML = '<tr><th class="checkbox-cell"><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>' +
-            headers.map(h => `<th>${h}</th>`).join('') +
-            '<th class="col-descripcion">Descripción</th>' + 
-            '<th>Observaciones</th>' +
-            '<th>Estado</th>' +
-            '<th>CUV</th>' +
-            '<th class="accionis">Acciones</th></tr>';
-
-        const filasPromises = data.map(async (row, index) => {
-            const idMovDoc = row.idMovDoc || row.IdMovDoc || row.IDMOVDOC || row.ID || '';
-            const nFact = row.nFact || row.NFact || row.NFACT || row.NoFactura || '';
-            const rowCells = headers.map(h => `<td>${row[h] ?? ''}</td>`).join('');
-            const descripcion = row.descripcion || '';
-
-            const filaHTML = 
-            `<tr data-nfact="${nFact}">
-                <td class="checkbox-cell"><input type="checkbox" class="filaCheckbox custom-checkbox" value="${idMovDoc}"></td>
-                ${rowCells}
-                <td class="col-descripcion">${descripcion}</td>
-                <td>${row.observaciones || ''}</td>
-                <td class="estado-cell">${row.estado || 'Pendiente'}</td>
-                <td class="cuv-cell"></td>
-                <td>
-                <div class="button-flex">
-                    <button class="button button-small button-success" onclick="enviarPaquete('${idMovDoc}', this)">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M22 2L11 13" />
-                            <path d="M22 2L15 22L11 13L2 9L22 2Z" />
-                        </svg>
-                        Enviar
-                    </button>
-                    <button class="button button-small button-success" onclick="DescargarPaquete(this)" data-id="${idMovDoc}">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                        </svg>
-                        Descargar
-                        Paquete
-                    </button>
-                </div>
-                    <div style="display: flex; justify-content: center; align-items: center; gap: 16px; margin-top: 20px;">
-                    <button 
-                        class="button button-small" 
-                        onclick="verJSON('${idMovDoc}')" 
-                        style="display: flex; flex-direction: column; align-items: center; min-width: 88px; padding: 8px 12px;">
-                        <span>Ver</span>
-                        <span style="font-size: 13px;">JSON</span>
-                    </button>
-
-                    <button 
-                        class="button button-small descargar-logs-btn" 
-                        style="display: none; flex-direction: column; align-items: center; min-width: 88px; padding: 8px 18px;" 
-                        onclick="descargarLogsGenerales(this)">
-                        <span>Descargar</span>
-                        <span style="font-size: 13px;">Logs</span>
-                    </button>
-                    </div>
-                </td>
-            </tr>`;
-
-            return { html: filaHTML, nFact: nFact };
-        });
-
-        const filas = await Promise.all(filasPromises);
-        body.innerHTML = filas.map(f => f.html).join('');
-
-        const toast = showToast('Procesando', 'Cargando CUVs...', 'success', 999999, true);
-
-        await procesarFilasEnLotes(filas, body, 30, toast);
-
-        showToast('Búsqueda completada', `Se encontraron ${data.length} resultados`, 'success');
-
-    } catch (err) {
-        showToast('Error', "Error en la solicitud: " + err.message, 'error');
-    } finally {
-        if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalHTML;
-            submitBtn.style.opacity = '1';
-            submitBtn.style.cursor = 'pointer';
-        }
-    }
-});
-
-async function procesarFilasEnLotes(filas, body, loteSize = 30, toast = null) {
-    for (let i = 0; i < filas.length; i += loteSize) {
-        const lote = filas.slice(i, i + loteSize);
-        const promesas = lote.map(async (filaData, index) => {
-            const fila = body.children[i + index];
-            if (filaData.nFact) {
-                await actualizarCUVEnFila(fila, filaData.nFact);
-            } else {
-                const cuvCell = fila.querySelector('.cuv-cell');
-                const enviarBtn = fila.querySelector('button[onclick*="enviarPaquete"]');
-                if (cuvCell) cuvCell.innerHTML = '';
-                if (enviarBtn) {
-                    enviarBtn.disabled = false;
-                    enviarBtn.classList.remove('button-disabled');
-                }
-            }
-        });
-
-        await Promise.all(promesas);
-
-        if (toast) {
-            const progreso = Math.min(100, Math.round(((i + lote.length) / filas.length) * 100));
-            actualizarToastProgreso(toast, progreso);
-        }
-    }
-
-    if (toast) {
-        actualizarToastProgreso(toast, 100);
-        const mensaje = toast.querySelector('.toast-content p');
-        if (mensaje) mensaje.textContent = 'CUVs Cargados correctamente';
-
-        setTimeout(() => {
-            if (toast.parentElement) {
-                toast.classList.add('fadeOut');
-                setTimeout(() => toast.remove(), 300);
-            }
-        }, 3000); 
-    }
-}
-
-
-function toggleSelectAll(checkbox) {
-    const checkboxes = document.querySelectorAll('.filaCheckbox');
-    checkboxes.forEach(cb => cb.checked = checkbox.checked);
-}
-
-function seleccionarPorEstado(tipo) {
-    const filas = document.querySelectorAll('#tablaBody tr');
-    let totalSeleccionadas = 0;
-
-    filas.forEach(fila => {
-        const estado = fila.querySelector('.estado-cell')?.textContent?.toLowerCase().trim();
-        const checkbox = fila.querySelector('.filaCheckbox');
-
-        if (!checkbox) return;
-
-        switch (tipo) {
-            case 'todos':
-                checkbox.checked = true;
-                totalSeleccionadas++;
-                fila.style.display = '';
-                break;
-            case 'pendientes':
-                const esPendiente = estado === 'pendiente';
-                checkbox.checked = esPendiente;
-                fila.style.display = esPendiente ? '' : 'none';
-                if (esPendiente) totalSeleccionadas++;
-                break;
-
-            case 'enviados':
-                const esEnviado = estado === 'enviado';
-                checkbox.checked = esEnviado;
-                fila.style.display = esEnviado ? '' : 'none';
-                if (esEnviado) totalSeleccionadas++;
-                break;
-            case 'ninguno':
-                checkbox.checked = false;
-                fila.style.display = '';
-                break;
-        }
-    });
-    
-    const selectAllCheckbox = document.getElementById('selectAll');
-    if (selectAllCheckbox) {
-        selectAllCheckbox.checked = tipo === 'todos';
-    }
-
-    verificarCheckboxes();
-}
-
-document.querySelectorAll('.button-secondary').forEach(btn => {
-btn.addEventListener('click', function () {
-
-    document.querySelectorAll('.button-secondary').forEach(b => b.classList.remove('activo'));
-
-    if (!this.textContent.toLowerCase().includes('deseleccionar')) {
-    this.classList.add('activo');
-    }
-});
-});
-
-function copiarAlPortapapeles(texto) {
-    if (navigator.clipboard && window.isSecureContext) {
-        return navigator.clipboard.writeText(texto);
-    } 
-
-    else {
-        return new Promise((resolve, reject) => {
-            const textarea = document.createElement('textarea');
-            textarea.value = texto;
-            textarea.style.position = 'fixed';
-            textarea.style.left = '-9999px';
-            textarea.style.top = '-9999px';
-            
-            document.body.appendChild(textarea);
-            textarea.focus();
-            textarea.select();
-            
-            try {
-                const exitoso = document.execCommand('copy');
-                document.body.removeChild(textarea);
-                
-                if (exitoso) {
-                    resolve();
-                } else {
-                    reject(new Error('No se pudo copiar'));
-                }
-            } catch (err) {
-                document.body.removeChild(textarea);
-                reject(err);
-            }
-        });
-    }
-}
-
-async function cargarTerceros() {
-    try {
-        const response = await fetch('/filtros/terceros');
-        const data = await response.json();
-        const select = document.getElementById('idTercero');
-
-        data.forEach(tercero => {
-            const option = document.createElement('option');
-            option.value = tercero.idTerceroKey;
-            option.textContent = tercero.nomTercero;
-            select.appendChild(option);
-        });
-    } catch (error) {
-        console.error("Error al cargar terceros:", error);
-    }
-}
-
-
-function verificarCheckboxes() {
-    const checkboxes = document.querySelectorAll('.filaCheckbox');
-    const descargarPaquetesBtn = document.getElementById('DescargarPaquetesBtn');
-    const enviarPaquetesBtn = document.getElementById('enviarPaquetesBtn');
-
-    const cantidadSeleccionados = Array.from(checkboxes).filter(checkbox => checkbox.checked).length;
-
-    descargarPaquetesBtn.disabled = cantidadSeleccionados < 2; 
-
-    enviarPaquetesBtn.disabled = cantidadSeleccionados < 2;
-}
-
-function descargarLogsGenerales(btn) {
-    const url = btn.dataset.downloadUrl;
-    const filename = btn.dataset.filename || 'logs.txt';
-
-    if (!url) {
-        alert('No hay logs disponibles.');
-        return;
-    }
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-
-    URL.revokeObjectURL(url);
-    delete btn.dataset.downloadUrl;
-}
-
-async function agregarCUVCompleto(nFact, cuv, idEstadoValidacion) {
-    let agregadoExitoso = false;
-    
-    const urlAgregar = `https://${host}:9876/api/sql/agregarcuv?nFact=${nFact}&ripsCuv=${cuv}`;
-    try {
-        const agregarResponse = await fetch(urlAgregar, { method: 'POST' });
-        if (agregarResponse.ok) {
-            console.log(`✅ CUV agregado en Factura Final para NFact ${nFact}`);
-            agregadoExitoso = true;
-        } else {
-            console.error('❌ Error al agregar CUV para Factura Final');
-            return false;
-        }
-    } catch (error) {
-        console.error('❌ Error en la solicitud agregarcuv:', error);
-        return false;
-    }
-
-    if (agregadoExitoso) {
-        const urlActualizar = `https://${host}:9876/api/sql/actualizarcuvrips?nFact=${nFact}&cuv=${cuv}&idEstadoValidacion=${idEstadoValidacion}`;
-        try {
-            const actualizarResponse = await fetch(urlActualizar, { 
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            if (actualizarResponse.ok) {
-                console.log(`✅ CUV agregado en Rips_Transaccion para NFact ${nFact} (Estado: ${idEstadoValidacion})`);
-            } else {
-                const errorText = await actualizarResponse.text();
-                console.error('❌ Error al agregar CUV en Rips_Transaccion:', errorText);
-
-            }
-        } catch (error) {
-            console.error('❌ Error en la solicitud agregarcuvrips:', error);
-
-        }
-    }
-
-    return agregadoExitoso;
-}
-
-async function actualizarSoloEstado(nFact, idEstadoValidacion) {
-    try {
-        const urlActualizar = `https://${host}:9876/api/sql/actualizarcuvrips?nFact=${nFact}&cuv=&idEstadoValidacion=${idEstadoValidacion}`;
-        const response = await fetch(urlActualizar, { 
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        if (response.ok) {
-            console.log(`✅ Estado actualizado a ${idEstadoValidacion} para NFact ${nFact}`);
-            return true;
-        } else {
-            const errorText = await response.text();
-            console.error('❌ Error al actualizar estado:', errorText);
-            return false;
-        }
-    } catch (error) {
-        console.error('❌ Error en la solicitud de actualización de estado:', error);
-        return false;
-    }
-}
-
-async function obtenerEstadoValidacion(nFact) {
-    const host = window.location.hostname;
-    const url = `https://${host}:9876/api/sql/estadovalidacion?nFact=${nFact}`;
-    
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            console.error('Error al consultar estado de validación:', response.status);
-            return null;
-        }
-        const data = await response.json(); 
-        return data.idEstadoValidacion;
-    } catch (error) {
-        console.error('Error al obtener estado de validación:', error);
-        return null;
-    }
-}
+// ==========================================================
+// FUNCIONES PARA ENVIO DE PAQUETES
+// ==========================================================
+
+/**
+ * Envía múltiples paquetes de facturas al validador del Ministerio de Salud.
+ * Procesa las facturas seleccionadas mediante checkboxes, ejecuta RIPS, genera JSON y XML,
+ * y envía cada paquete al servidor de validación.
+ * 
+ * @async
+ * @function enviarPaquetes
+ * @returns {Promise<void>}
+ * 
+ * @throws {Error} Si falla la comunicación con el servidor o el procesamiento de facturas
+ * 
+ */
 
 async function enviarPaquetes() {
     const boton = document.getElementById('enviarPaquetesBtn');
     const textoOriginal = boton.innerHTML;
     const boton2 = document.getElementById('botonBuscar');
-    const textoOriginal2 = boton2.innerHTML;
 
     const boton3 = document.getElementById('DescargarPaquetesBtn')
 
@@ -1608,6 +1615,20 @@ async function enviarPaquetes() {
     }
 }
 
+/**
+ * Envía un paquete individual de factura al validador del Ministerio de Salud.
+ * 
+ * @async
+ * @function enviarPaquete
+ * @param {string} idMovDoc - ID del documento de movimiento (factura) a procesar
+ * @param {HTMLButtonElement} buttonElement - Elemento del botón que inició el envío
+ * @returns {Promise<void>}
+ * 
+ * 
+ * @throws {Error} Si falla la autenticación (token inválido/vacío)
+ * @throws {Error} Si falla la comunicación con el servidor
+ * @throws {Error} Si el procesamiento de RIPS, JSON o XML falla
+ */
 async function enviarPaquete(idMovDoc, buttonElement) {
     const host = window.location.hostname;
     const token = sessionStorage.getItem('token');
@@ -1741,7 +1762,7 @@ async function enviarPaquete(idMovDoc, buttonElement) {
                     showToast('Advertencia', 'Paquete fue exitoso pero no se guardó el CUV', 'warning');
                 }
             } else {
-                console.warn(`⚠️ Respuesta exitosa sin CUV para NFact ${nFact}`);
+                console.warn(`Respuesta exitosa sin CUV para NFact ${nFact}`);
                 showToast('Advertencia', `Paquete exitoso pero sin CUV para NFact ${nFact}`, 'warning');
 
             }
@@ -1758,7 +1779,7 @@ async function enviarPaquete(idMovDoc, buttonElement) {
                 
                 const exitoso = await agregarCUVCompleto(nFact, ripsCuv, idEstadoValidacion);
                 if (exitoso) {
-                    console.log(`✅ CUV agregado para NFact ${nFact}`);
+                    console.log(`CUV agregado para NFact ${nFact}`);
                     await actualizarCUVEnFila(fila, nFact);
                     showToast('Éxito', `CUV agregado para NFact ${nFact}`, 'success');
                     cuvAgregado = true;
@@ -1885,6 +1906,19 @@ async function enviarPaquete(idMovDoc, buttonElement) {
 }
 
 
+// ==========================================================
+// FUNCIONES PARA DESCARGAS 
+// ==========================================================
+
+/**
+ * Descarga múltiples paquetes de facturas seleccionadas mediante checkboxes.
+ * Ejecuta RIPS, descarga archivos ZIP y genera un reporte detallado del proceso.
+ * 
+ * @async
+ * @function DescargarPaquetes
+ * @returns {Promise<void>}
+ * 
+ */
 async function DescargarPaquetes() {
     const checkboxes = document.querySelectorAll('.filaCheckbox:checked');
 
@@ -1974,7 +2008,7 @@ async function DescargarPaquetes() {
             
             if (ripsError) {
                 erroresRips.push(doc.idMovDoc);
-                reporte.push(`❌ ${doc.nFact}: ERROR RIPS`);
+                reporte.push(`⚠ ${doc.nFact}: ERROR RIPS`);
                 reporte.push(`   Detalle: ${ripsError}`);
                 reporte.push('');
             }
@@ -1992,7 +2026,7 @@ async function DescargarPaquetes() {
         reporte.push('');
 
         if (documentosValidos.length === 0) {
-            reporte.push('❌ PROCESO FINALIZADO: Ningún documento pasó la validación RIPS');
+            reporte.push('⚠ PROCESO FINALIZADO: Ningún documento pasó la validación RIPS');
             await guardarReporte(directoryHandle, reporte);
             
             showToast('Error', 'Ningún documento pasó validación RIPS. Se generó reporte con detalles.', 'error', 8000);
@@ -2018,7 +2052,7 @@ async function DescargarPaquetes() {
             
             if (downloadError) {
                 paquetesFallidos.push(doc.nFact);
-                reporte.push(`❌ ${doc.nFact}: ERROR EN DESCARGA`);
+                reporte.push(`⚠ ${doc.nFact}: ERROR EN DESCARGA`);
                 reporte.push(`   Detalle: ${downloadError}`);
                 reporte.push('');
             } else {
@@ -2038,8 +2072,8 @@ async function DescargarPaquetes() {
         reporte.push('='.repeat(80));
         reporte.push(`Total procesados: ${documentosSeleccionados.length}`);
         reporte.push(`✓ Exitosos: ${paquetesExitosos.length}`);
-        reporte.push(`❌ Fallidos (RIPS): ${erroresRips.length}`);
-        reporte.push(`❌ Fallidos (Descarga): ${paquetesFallidos.length}`);
+        reporte.push(`⚠ Fallidos (RIPS): ${erroresRips.length}`);
+        reporte.push(`⚠ Fallidos (Descarga): ${paquetesFallidos.length}`);
         reporte.push('='.repeat(80));
 
         // Guardar reporte como TXT
@@ -2062,7 +2096,7 @@ async function DescargarPaquetes() {
         } else if (paquetesExitosos.length > 0 && totalFallidos > 0) {
             showToast(
                 'Proceso Completado con Errores', 
-                `✓ ${paquetesExitosos.length} exitosos | ❌ ${totalFallidos} fallidos. Ver reporte_descarga.txt para detalles.`,
+                `✓ ${paquetesExitosos.length} exitosos | ⚠ ${totalFallidos} fallidos. Ver reporte_descarga.txt para detalles.`,
                 'warning',
                 10000
             );
@@ -2097,37 +2131,21 @@ async function DescargarPaquetes() {
     }
 }
 
-// Función para guardar el reporte como TXT
-async function guardarReporte(directoryHandle, lineasReporte) {
-    try {
-        
-        const ahora = new Date();
-        const bogota = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Bogota' }));
-        
-        const dia = String(bogota.getDate()).padStart(2, '0');
-        const mes = String(bogota.getMonth() + 1).padStart(2, '0');
-        const año = bogota.getFullYear();
-        const hora = String(bogota.getHours()).padStart(2, '0');
-        const minuto = String(bogota.getMinutes()).padStart(2, '0');
-        const segundo = String(bogota.getSeconds()).padStart(2, '0');
-        
-        const timestamp = `${dia}-${mes}-${año}_${hora}-${minuto}-${segundo}`;
-        const nombreArchivo = `reporte_descarga_${timestamp}.txt`;
-        
-        const fileHandle = await directoryHandle.getFileHandle(nombreArchivo, { create: true });
-        const writable = await fileHandle.createWritable();
-        
-        const contenido = lineasReporte.join('\n');
-        await writable.write(contenido);
-        await writable.close();
-        
-        console.log(`✓ Reporte guardado: ${nombreArchivo}`);
-    } catch (error) {
-        console.error('Error al guardar reporte:', error);
-        showToast('Advertencia', 'No se pudo guardar el archivo de reporte', 'warning', 5000);
-    }
-}
 
+/**
+ * Descarga un paquete individual de factura.
+ * Ejecuta RIPS, descarga el archivo ZIP y guarda en la carpeta seleccionada por el usuario.
+ * 
+ * @async
+ * @function DescargarPaquete
+ * @param {HTMLButtonElement} button - Elemento del botón que inició la descarga
+ * @returns {Promise<void>}
+ *  
+ * @throws {Error} Si no se encuentra nFact o ID del documento
+ * @throws {Error} Si el usuario no otorga permisos de escritura
+ * @throws {Error} Si falla la ejecución de RIPS o la descarga
+ * 
+ */
 async function DescargarPaquete(button) {
     const botonBuscar = document.getElementById("botonBuscar");
     const tipo = "json";
@@ -2220,75 +2238,101 @@ async function DescargarPaquete(button) {
     }
 }
 
-
-
-async function ejecutarRips(nfact) {
+/**
+ * Guarda un reporte de descarga como archivo de texto (.txt) en la carpeta seleccionada.
+ * El nombre del archivo incluye timestamp con fecha y hora de Bogotá.
+ * 
+ * @async
+ * @function guardarReporte
+ * @param {FileSystemDirectoryHandle} directoryHandle - Handle del directorio donde se guardará el reporte
+ * @param {string[]} lineasReporte - Array de strings donde cada elemento es una línea del reporte
+ * @returns {Promise<void>}
+ * 
+ * @throws {Error} Si falla la creación o escritura del archivo (capturado internamente)
+ */
+async function guardarReporte(directoryHandle, lineasReporte) {
     try {
-        const response = await fetch(`/api/sql/ejecutarRips?Nfact=${encodeURIComponent(nfact)}`);
-        const result = await response.text();
-
-        if (!response.ok) {
-            return `Error al ejecutar RIPS para ${nfact}: ${result}`;
-        }
-
-        return null;
-    } catch (error) {
-        return `Error de red al ejecutar RIPS para ${nfact}: ${error.message}`;
-    }
-}
-
-async function descargarZip(id, tipo, xml, directoryHandle) {
-    const host = window.location.hostname;
-    const url = `https://${host}:9876/facturas/generarzip/${id}/${tipo}/${xml}`; 
-
-    try {
-        const response = await fetch(url);
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            return errorText;
-        }
-
-        const blob = await response.blob();
-        let fileName = `certificado_${id}.zip`;
-
-        const contentDisposition = response.headers.get('Content-Disposition');
-        if (contentDisposition && contentDisposition.includes('filename=')) {
-            fileName = contentDisposition.split('filename=')[1].replace(/['"]/g, '').trim();
-        }
-
-        const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
+        
+        const ahora = new Date();
+        const bogota = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+        
+        const dia = String(bogota.getDate()).padStart(2, '0');
+        const mes = String(bogota.getMonth() + 1).padStart(2, '0');
+        const año = bogota.getFullYear();
+        const hora = String(bogota.getHours()).padStart(2, '0');
+        const minuto = String(bogota.getMinutes()).padStart(2, '0');
+        const segundo = String(bogota.getSeconds()).padStart(2, '0');
+        
+        const timestamp = `${dia}-${mes}-${año}_${hora}-${minuto}-${segundo}`;
+        const nombreArchivo = `reporte_descarga_${timestamp}.txt`;
+        
+        const fileHandle = await directoryHandle.getFileHandle(nombreArchivo, { create: true });
         const writable = await fileHandle.createWritable();
-        await writable.write(blob);
+        
+        const contenido = lineasReporte.join('\n');
+        await writable.write(contenido);
         await writable.close();
-
-        return false;
+        
+        console.log(`✓ Reporte guardado: ${nombreArchivo}`);
     } catch (error) {
-        return `Error de red para ID ${id}: ${error.message}`;
+        console.error('Error al guardar reporte:', error);
+        showToast('Advertencia', 'No se pudo guardar el archivo de reporte', 'warning', 5000);
     }
 }
 
-document.getElementById('idTercero').addEventListener('change', async function () {
-    const idTerceroKey = this.value;
-    const selectContratos = document.getElementById('noContrato');
-    selectContratos.innerHTML = '<option value="">Seleccione un contrato</option>';
+/**
+ * Descarga el log de errores de una factura desde una URL almacenada en el botón.
+ * Después de descargar, limpia la URL temporal del botón.
+ * 
+ * @param {HTMLButtonElement} btn - Botón que contiene la URL y nombre del archivo en sus data attributes
+ * 
+ * @description
+ * Requiere que el botón tenga:
+ * - data-download-url: URL blob temporal del archivo
+ * - data-filename: Nombre sugerido para el archivo (opcional, por defecto 'logs.txt')
+ * 
+ */
+function descargarLogsGenerales(btn) {
+    const url = btn.dataset.downloadUrl;
+    const filename = btn.dataset.filename || 'logs.txt';
 
-    if (idTerceroKey) {
-        try {
-            const response = await fetch(`/filtros/contratos?idTerceroKey=${idTerceroKey}`);
-            const data = await response.json();
-
-            data.forEach(contrato => {
-                const option = document.createElement('option');
-                option.value = contrato.noContrato;
-                option.textContent = contrato.nomContrato;
-                selectContratos.appendChild(option);
-            });
-        } catch (error) {
-            console.error("Error al cargar contratos:", error);
-        }
+    if (!url) {
+        alert('No hay logs disponibles.');
+        return;
     }
-});
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    URL.revokeObjectURL(url);
+    delete btn.dataset.downloadUrl;
+}
+
+
+
+
+// ==========================================================
+// FUNCIONES PARA MANEJO DE NOTIFICACIONES
+// ==========================================================
+
+/**
+ * Muestra una notificación toast en la interfaz de usuario.
+ * Soporta diferentes tipos visuales (éxito, error, advertencia) y barra de progreso opcional.
+ * 
+ * @function showToast
+ * @param {string} title - Título del toast mostrado en negrita
+ * @param {string} message - Mensaje principal del toast
+ * @param {('success'|'error'|'warning'|'info')} [type='success'] - Tipo de toast que determina color y estilo
+ * @param {number} [duration=6000] - Duración en milisegundos antes de ocultarse automáticamente
+ * @param {boolean} [showProgress=false] - Si true, muestra barra de progreso controlable manualmente
+ * @returns {HTMLElement} Elemento DOM del toast creado (útil para actualizar progreso)
+ * 
+ * 
+ */
 
 function showToast(title, message, type = 'success', duration = 6000, showProgress = false) {
     const container = document.getElementById('toastContainer');
@@ -2324,6 +2368,16 @@ function showToast(title, message, type = 'success', duration = 6000, showProgre
     return toast;
 }
 
+/**
+ * Actualiza el porcentaje de la barra de progreso en un toast existente.
+ * Solo funciona en toasts creados con showProgress=true.
+ * 
+ * @function actualizarToastProgreso
+ * @param {HTMLElement} toast - Elemento DOM del toast que contiene la barra de progreso
+ * @param {number} porcentaje - Porcentaje de progreso entre 0 y 100
+ * @returns {void}
+ */
+
 function actualizarToastProgreso(toast, porcentaje) {
     const progressBar = toast.querySelector('.toast-progress-bar');
     if (progressBar) {
@@ -2331,7 +2385,24 @@ function actualizarToastProgreso(toast, porcentaje) {
     }
 }
 
-        
+
+
+
+
+
+// ==========================================================
+// FUNCIONES UTILES
+// ==========================================================
+
+/**
+ * Alterna la expansión y contracción de contenido colapsable con animación suave.
+ * Utilizado para mostrar/ocultar listas largas de errores, detalles o información extensa.
+ * 
+ * @function toggleExpand
+ * @param {HTMLButtonElement} button - Botón que activa la expansión (debe tener hermano .expand-content)
+ * @returns {void}
+ * 
+ */
 function toggleExpand(button) {
     const content = button.nextElementSibling;
     const isExpanded = content.classList.contains('expanded');
@@ -2356,4 +2427,221 @@ function toggleExpand(button) {
         });
     }
 }
+
+
+/**
+ * Ejecuta el procedimiento almacenado RIPS para una factura específica.
+ * Este procedimiento valida y genera los archivos RIPS necesarios.
+ * 
+ * @async
+ * @function ejecutarRips
+ * @param {string} nfact - Número de factura a procesar
+ * @returns {Promise<string|null>} Mensaje de error si falla, null si es exitoso
+ * 
+ * 
+ */
+async function ejecutarRips(nfact) {
+    try {
+        const response = await fetch(`/api/sql/ejecutarRips?Nfact=${encodeURIComponent(nfact)}`);
+        const result = await response.text();
+
+        if (!response.ok) {
+            return `Error al ejecutar RIPS para ${nfact}: ${result}`;
+        }
+
+        return null;
+    } catch (error) {
+        return `Error de red al ejecutar RIPS para ${nfact}: ${error.message}`;
+    }
+}
+
+/**
+ * Descarga un archivo ZIP que contiene los archivos de una factura (JSON y opcionalmente XML).
+ * Guarda el archivo directamente en la carpeta seleccionada por el usuario usando File System Access API.
+ * 
+ * @async
+ * @function descargarZip
+ * @param {string} id - ID del documento (idMovDoc) a descargar
+ * @param {string} tipo - Tipo de archivo a incluir en el ZIP (generalmente "json")
+ * @param {boolean} xml - Si true, incluye el archivo XML en el ZIP; si false, solo JSON
+ * @param {FileSystemDirectoryHandle} directoryHandle - Handle del directorio donde se guardará el archivo
+ * @returns {Promise<boolean|string>} false si es exitoso, mensaje de error (string) si falla
+ * 
+ * @throws {Error} Captura errores de red y retorna mensaje descriptivo como string
+ */
+async function descargarZip(id, tipo, xml, directoryHandle) {
+    const host = window.location.hostname;
+    const url = `https://${host}:9876/facturas/generarzip/${id}/${tipo}/${xml}`; 
+
+    try {
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            return errorText;
+        }
+
+        const blob = await response.blob();
+        let fileName = `certificado_${id}.zip`;
+
+        const contentDisposition = response.headers.get('Content-Disposition');
+        if (contentDisposition && contentDisposition.includes('filename=')) {
+            fileName = contentDisposition.split('filename=')[1].replace(/['"]/g, '').trim();
+        }
+
+        const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+
+        return false;
+    } catch (error) {
+        return `Error de red para ID ${id}: ${error.message}`;
+    }
+}
+
+/**
+ * Alterna el estado de selección de todos los checkboxes de las filas.
+ * 
+ * @param {HTMLInputElement} checkbox - Checkbox principal "Seleccionar todo"
+ */
+function toggleSelectAll(checkbox) {
+    const checkboxes = document.querySelectorAll('.filaCheckbox');
+    checkboxes.forEach(cb => cb.checked = checkbox.checked);
+}
+
+/**
+ * Selecciona filas según su estado de validación y opcionalmente las filtra visualmente.
+ * 
+ * @param {string} tipo - Tipo de selección: 'todos', 'pendientes', 'enviados' o 'ninguno'
+ * 
+ */
+function seleccionarPorEstado(tipo) {
+    const filas = document.querySelectorAll('#tablaBody tr');
+    let totalSeleccionadas = 0;
+
+    filas.forEach(fila => {
+        const estado = fila.querySelector('.estado-cell')?.textContent?.toLowerCase().trim();
+        const checkbox = fila.querySelector('.filaCheckbox');
+
+        if (!checkbox) return;
+
+        switch (tipo) {
+            case 'todos':
+                checkbox.checked = true;
+                totalSeleccionadas++;
+                fila.style.display = '';
+                break;
+            case 'pendientes':
+                const esPendiente = estado === 'pendiente';
+                checkbox.checked = esPendiente;
+                fila.style.display = esPendiente ? '' : 'none';
+                if (esPendiente) totalSeleccionadas++;
+                break;
+
+            case 'enviados':
+                const esEnviado = estado === 'enviado';
+                checkbox.checked = esEnviado;
+                fila.style.display = esEnviado ? '' : 'none';
+                if (esEnviado) totalSeleccionadas++;
+                break;
+            case 'ninguno':
+                checkbox.checked = false;
+                fila.style.display = '';
+                break;
+        }
+    });
+    
+    const selectAllCheckbox = document.getElementById('selectAll');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.checked = tipo === 'todos';
+    }
+
+    verificarCheckboxes();
+}
+
+/**
+ * Copia texto al portapapeles del usuario.
+ * Utiliza Clipboard API si está disponible, de lo contrario usa execCommand (fallback).
+ * 
+ * @param {string} texto - Texto a copiar al portapapeles
+ * @returns {Promise<void>} Promesa que se resuelve cuando el texto se copia exitosamente
+ * @throws {Error} Si no se puede copiar el texto
+ */
+function copiarAlPortapapeles(texto) {
+    if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(texto);
+    } 
+
+    else {
+        return new Promise((resolve, reject) => {
+            const textarea = document.createElement('textarea');
+            textarea.value = texto;
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-9999px';
+            textarea.style.top = '-9999px';
+            
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            
+            try {
+                const exitoso = document.execCommand('copy');
+                document.body.removeChild(textarea);
+                
+                if (exitoso) {
+                    resolve();
+                } else {
+                    reject(new Error('No se pudo copiar'));
+                }
+            } catch (err) {
+                document.body.removeChild(textarea);
+                reject(err);
+            }
+        });
+    }
+}
+
+/**
+ * Carga la lista de terceros (entidades/clientes) desde el servidor
+ * y puebla un elemento select con las opciones.
+ * 
+ * @returns {Promise<void>}
+ * @throws {Error} Si falla la petición al servidor
+ */
+async function cargarTerceros() {
+    try {
+        const response = await fetch('/filtros/terceros');
+        const data = await response.json();
+        const select = document.getElementById('idTercero');
+
+        data.forEach(tercero => {
+            const option = document.createElement('option');
+            option.value = tercero.idTerceroKey;
+            option.textContent = tercero.nomTercero;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error("Error al cargar terceros:", error);
+    }
+}
+
+/**
+ * Verifica cuántos checkboxes están seleccionados y habilita/deshabilita
+ * los botones de descarga y envío masivo según la cantidad.
+ *
+ */
+function verificarCheckboxes() {
+    const checkboxes = document.querySelectorAll('.filaCheckbox');
+    const descargarPaquetesBtn = document.getElementById('DescargarPaquetesBtn');
+    const enviarPaquetesBtn = document.getElementById('enviarPaquetesBtn');
+
+    const cantidadSeleccionados = Array.from(checkboxes).filter(checkbox => checkbox.checked).length;
+
+    descargarPaquetesBtn.disabled = cantidadSeleccionados < 2; 
+
+    enviarPaquetesBtn.disabled = cantidadSeleccionados < 2;
+}
+
+
 
