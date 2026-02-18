@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Activos Fijos</title>
+    <link rel="stylesheet" type="text/css" href="css/entrada.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Sistema de Almacén</h1>
+            <p>Registro y Control de Entradas</p>
+        </div>
+
+        <div class="content">
+
+            <!-- Formulario de Información de Entrada -->
+            <div id="tab-registrar">
+                <form id="formRegistrar">
+
+                    <div class="header-form">
+                        <h3>Información de la Entrada</h3>
+                        
+                        <div class="header-form-buttons">
+                            <button type="button" class="btn btn-primary" onclick="abrirModalBusqueda()" style="display: flex; align-items: center; gap: 8px;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <path d="m21 21-4.35-4.35"></path>
+                                </svg>
+                                Buscar Entradas
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Fecha <span class="required">*</span></label>
+                            <input type="datetime-local" id="fecha" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Origen <span class="required">*</span></label>
+                            <select id="origen" required>
+                                <option value="">Seleccione...</option>
+                                <option value="Compra">Compra</option>
+                                <option value="NC">Nota de Crédito</option>
+                                <option value="Ajuste">Ajuste</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Documento <span class="required">*</span></label>
+                            <input type="text" id="documento" required maxlength="20" placeholder="Ej: FAC, NC, AJ">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Número de Documento <span class="required">*</span></label>
+                            <input type="text" id="numeroDocumento" disabled>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Observaciones</label>
+                            <textarea id="observaciones" maxlength="300" placeholder="Ingrese observaciones adicionales..."></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Usuario <span class="required">*</span></label>
+                            <input type="text" id="usuario" required maxlength="50" placeholder="Nombre del usuario" disabled>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Bodega</label>
+                            <select id="bodegaKey" name="bodegaKey">
+                                <option value="" selected>-- Seleccione una bodega--</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="alert-container"></div>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn btn-primary">Crear Entrada</button>
+                        <button type="button" class="btn btn-secondary" onclick="limpiarFormulario()">Limpiar</button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="detalle-entrada" style="margin-top: 30px; padding: 20px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea; display: none;">
+                <div class="info-entrada">
+                    <h3>Agregar Producto a la Entrada</h3>
+                    <div style="display: flex; gap: 30px; margin-top: 15px; margin-bottom: 15px;" id="info-entrada-actual">
+                        <p><strong>ID Entrada:</strong> <span id="entrada-key-display">-</span></p>
+                    </div>
+                </div>
+                
+                <form id="formDetalle" onsubmit="guardarDetalle(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Producto <span class="required">*</span></label>
+                            <input type="text"
+                                id="productosKey"
+                                placeholder="Click para seleccionar un producto"
+                                readonly
+                                required
+                                onclick="abrirDropdownProductos('productosKey')"
+                                style="cursor: pointer; background-color: white;">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Cantidad <span class="required">*</span></label>
+                            <input type="text" id="cantidad" required step="0.01" placeholder="0.00">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Valor Compra <span class="required">*</span></label>
+                            <input type="text" id="valorCompra" required step="0.01" placeholder="0.00">
+                        </div>
+
+                        <div class="form-group">
+                            <label>IVA % <span class="required">*</span></label>
+                            <input type="text" id="iva" required min="0" max="100" placeholder="19">
+                        </div>
+                    </div>
+                    
+                    <div id="alert-detalle"></div>
+                    
+                    <div class="button-group">
+                        <button type="submit" class="btn btn-primary">Guardar Producto</button>
+                        <button type="button" class="btn btn-secondary" onclick="limpiarFormularioDetalle()">Limpiar</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Tabla de Productos -->
+            <div class="tabla-container" style="margin-top: 30px;">
+                <h3>Lista de Productos</h3>
+                <div id="tabla-productos">
+                    <div class="no-data">Seleccione una entrada para ver sus productos</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalBusqueda" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Buscar Entradas</h2>
+                <button class="btn-close" onclick="cerrarModalBusqueda()">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <form id="formBusqueda" onsubmit="event.preventDefault(); buscarEntradas();">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Fecha Desde <span class="required">*</span></label>
+                            <input type="date" id="buscarFechaDesde" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Fecha Hasta <span class="required">*</span></label>
+                            <input type="date" id="buscarFechaHasta" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Origen</label>
+                            <select id="buscarOrigen">
+                                <option value="">Todos</option>
+                                <option value="Compra">Compra</option>
+                                <option value="NC">Nota de Crédito</option>
+                                <option value="Ajuste">Ajuste</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Tipo Documento</label>
+                            <input type="text" id="buscarDocumento" maxlength="20" placeholder="Ej: CC, FAC, NC">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Número Desde</label>
+                            <input type="number" id="buscarNumeroDesde" placeholder="0" min="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Número Hasta</label>
+                            <input type="number" id="buscarNumeroHasta" placeholder="999999" min="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Tercero Key</label>
+                            <input type="number" id="buscarIdTercero" placeholder="ID del tercero" min="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Bodega Key</label>
+                            <select id="buscarBodegaKey" name="buscarBodegaKey">
+                                <option value="" selected>-- Seleccione una bodega--</option>
+                            </select>
+
+                        </div>
+                    </div>
+
+                    <div class="button-group" style="margin-top: 20px;">
+                        <button type="submit" class="btn btn-primary">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 5px;">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                            Buscar
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="limpiarBusqueda()">Limpiar Filtros</button>
+                        <button type="button" class="btn btn-secondary" onclick="cerrarModalBusqueda()">Cancelar</button>
+                    </div>
+                </form>
+
+                <div id="resultadosBusqueda" style="margin-top: 30px; display: none;">
+                    <h3>Resultados de la Búsqueda (<span id="totalResultados">0</span>)</h3>
+                    <div id="tablaResultados" style="max-height: 400px; overflow-y: auto; cursor: pointer;">
+                        <div class="loading">Buscando...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-editar" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Editar Producto</h2>
+                <span class="close" onclick="cerrarModalEditar()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="formEditar">
+                    <h3>Información del Producto</h3>
+                        
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Productos Key <span class="required">*</span></label>
+                            <input type="text"
+                                id="edit-productosKey"
+                                readonly
+                                required
+                                onclick="abrirDropdownProductos('edit-productosKey')"
+                                style="cursor: pointer; background-color: white;">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Cantidad <span class="required">*</span></label>
+                            <input type="text" id="edit-cantidad" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Valor Compra <span class="required">*</span></label>
+                            <input type="text" id="edit-valorCompra" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Iva <span class="required">*</span></label>
+                            <input type="text" id="edit-iva" required>
+                        </div>
+                    </div>
+
+                    <div id="alert-modal"></div>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn btn-primary">Actualizar</button>
+                        <button type="button" class="btn btn-secondary" onclick="cerrarModalEditar()">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-contabilizar" class="modal">
+        <div class="modal-content modal-content-small">
+            <div class="modal-header">
+                <h2>Confirmar Contabilización</h2>
+                <span class="close" onclick="cerrarModalContabilizar()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div style="text-align: center; padding: 20px;">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2" style="margin-bottom: 20px;">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M12 16v-4"></path>
+                        <path d="M12 8h.01"></path>
+                    </svg>
+                    
+                    <h3 style="margin-bottom: 15px; color: #2d3748;">¿Desea contabilizar esta entrada?</h3>
+                    <p style="color: #718096; margin-bottom: 20px;">
+                        Esta acción registrará la entrada en el sistema contable.
+                    </p>
+                    
+                    <p style="color: #4a5568; font-weight: 600;">
+                        ID Detalle: <span id="contabilizar-entradas-key">-</span>
+                    </p>
+                </div>
+
+                <div id="alert-contabilizar"></div>
+
+                <div class="button-group-modal">
+                    <button type="button" class="btn btn-primary" onclick="confirmarContabilizacion()">
+                        Confirmar
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="cerrarModalContabilizar()">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dropdown de Productos -->
+    <div id="dropdownProductos" class="dropdown-productos" style="display: none;">
+        <div class="dropdown-header">
+            <input type="text" 
+                id="buscarProductoTexto" 
+                placeholder="Buscar producto..." 
+                oninput="buscarDropdownProductos()"
+                autofocus>
+            <button class="btn-close-dropdown" onclick="cerrarDropdownProductos()">&times;</button>
+        </div>
+        
+        <div id="resultadosProductos" class="dropdown-body">
+            <div class="loading">Cargando productos...</div>
+        </div>
+    </div>
+
+    <script src="js/entrada.js"></script>
+    
+</body>
+</html>
