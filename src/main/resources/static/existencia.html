@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Activos Fijos</title>
+    <link rel="stylesheet" type="text/css" href="css/existencia.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Sistema de Almacén</h1>
+            <p>Existencias</p>
+        </div>
+
+        <div class="content">
+
+            <!-- Tabla de Productos -->
+            <div class="tabla-container">
+
+                <div class="tabla-header">
+                    <h2>Consultar Existencias</h2>
+                    
+                    <div class="filtros-container">
+
+                        <div class="filtro">
+                            <label>Producto <span class="required">*</span></label>
+                            <input type="text"
+                                id="productosKey"
+                                placeholder="Click para seleccionar un producto"
+                                readonly
+                                required
+                                onclick="abrirDropdownProductos('productosKey')"
+                                style="cursor: pointer; background-color: white;">
+                        </div>
+
+                        <div class="filtro">
+                            <label>Bodegas</label>
+                            <select id="bodegaKey" name="bodegaKey" >
+                                <option value="" selected>
+                                    --Selecciona una Bodega--
+                                </option> 
+                            </select>
+                        </div>
+
+                        <div class="filtro">
+                            <label>Categorias</label>
+                            <select id="categoriaKey" name="categoriaKey" >
+                                <option value="" selected>
+                                    --Selecciona una Categoria--
+                                </option> 
+                            </select>
+                        </div>
+
+                    </div>
+
+                    <button type="button" class="btn btn-primary" onclick="cargarExistencia()">Buscar</button>
+
+                </div>
+                
+                <div id="tabla-productos">
+                    <div class="loading">Cargando datos...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-editar" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Editar Producto</h2>
+                <span class="close" onclick="cerrarModalEditar()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="formEditar">
+                    <h3>Información del Producto</h3>
+                    
+                    <input type="hidden" id="edit-productos-key">
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Codigo <span class="required">*</span></label>
+                            <input type="text" id="edit-codigo" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Nombre <span class="required">*</span></label>
+                            <input type="text" id="edit-nombre" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Unidad de Medida <span class="required">*</span></label>
+                            <input type="text" id="edit-unidadMedida" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Categoria Key <span class="required">*</span></label>
+                            <input type="number" id="edit-categoriasKey" required min="1">
+                        </div>
+
+                        <div class="form-group">
+                            <label>StockMinimo <span class="required">*</span></label>
+                            <input type="number" id="edit-stockMinimo" required min="1">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Activo <span class="required">*</span></label>
+                            <select id="edit-activo">
+                                <option value="true">Si</option>
+                                <option value="false">No</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="alert-modal"></div>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn btn-primary">Actualizar</button>
+                        <button type="button" class="btn btn-secondary" onclick="cerrarModalEditar()">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="dropdownProductos" class="dropdown-productos" style="display: none;">
+        <div class="dropdown-header">
+            <input type="text" 
+                id="buscarProductoTexto" 
+                placeholder="Buscar producto..." 
+                oninput="buscarDropdownProductos()"
+                autofocus>
+            <button class="btn-close-dropdown" onclick="cerrarDropdownProductos()">&times;</button>
+        </div>
+        
+        <div id="resultadosProductos" class="dropdown-body">
+            <div class="loading">Cargando productos...</div>
+        </div>
+    </div>
+
+     <script src="js/existencia.js"></script>
+</body>
+</html>
