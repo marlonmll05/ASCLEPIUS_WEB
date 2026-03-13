@@ -42,6 +42,7 @@ public class FacturasController {
 
         byte[] xmlBytes = facturasService.exportDocXml(idMovDoc);
 
+        @SuppressWarnings("null")
         ByteArrayResource resource = new ByteArrayResource(xmlBytes);
 
         return ResponseEntity.ok(resource);
@@ -53,12 +54,14 @@ public class FacturasController {
         
         byte[] jsonBytes = facturasService.generarjson(idMovDoc);
 
+        @SuppressWarnings("null")
         ByteArrayResource jsonResponse = new ByteArrayResource(jsonBytes);
 
         return ResponseEntity.ok(jsonResponse);
     }
 
     // Endpoint para generar txt de facturas
+    @SuppressWarnings("null")
     @GetMapping("/generartxt/{idMovDoc}")
     public ResponseEntity<Map<String, ByteArrayResource>> generarTxt(@PathVariable int idMovDoc) throws SQLException {
         
@@ -74,6 +77,7 @@ public class FacturasController {
     }
 
     // Endpoint para generar zip de los 3 anteriores
+    @SuppressWarnings("null")
     @GetMapping("/generarzip/{idMovDoc}/{tipoArchivo}/{incluirXml}")
     public ResponseEntity<ByteArrayResource> generarZip(
         @PathVariable int idMovDoc,
@@ -84,6 +88,7 @@ public class FacturasController {
         byte[] zipBytes = zipResult.getZipBytes();
         String fileName = zipResult.getFileName();
 
+        @SuppressWarnings("null")
         ByteArrayResource resource = new ByteArrayResource(zipBytes);
 
         return ResponseEntity.ok()

@@ -148,6 +148,7 @@ public class AtencionesController {
     }
 
     //ENDPOINT PARA GENERAR APOYO DIAGNOSTICO (IMAGENES A PDF)
+    @SuppressWarnings("null")
     @GetMapping("/generar-apoyo-diagnostico")
     public ResponseEntity<byte[]> generarPdfApoyoDiagnostico(
             @RequestParam int idAdmision,
@@ -203,6 +204,7 @@ public class AtencionesController {
 
 
     //ENDPOINT PARA EXPORTAR EL CONTENIDO DE UNA ADMISION
+    @SuppressWarnings("null")
     @GetMapping("/exportar-pdf")
     public ResponseEntity<?> exportarPdfIndividual(
             @RequestParam Long idAdmision,
@@ -224,6 +226,7 @@ public class AtencionesController {
     }
 
     //ENDPOINT PARA OBTENER EL XML DE UNA FACTURA Y RENOMBRARLO
+    @SuppressWarnings("null")
     @GetMapping("/generarxml/{nFact}")
     public ResponseEntity<byte[]> generarXml(@PathVariable String nFact) throws SQLException {
         XmlDocumento xml = exportarService.generarXml(nFact);
@@ -243,6 +246,7 @@ public class AtencionesController {
     }
 
     //ENDPOINT PARA VER EL CONTENIDO DE UN PDF
+    @SuppressWarnings("null")
     @GetMapping("/admisiones/ver-pdf")
     public ResponseEntity<?> verPdf(
             @RequestParam Long idAdmision,

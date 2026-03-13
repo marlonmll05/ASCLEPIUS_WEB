@@ -20,6 +20,7 @@ public class ReporteController {
     }
 
     // ENDPOINT PARA DESCARGAR UN PDF DE SOPORTE
+    @SuppressWarnings("null")
     @GetMapping("/descargar-pdf")
     public ResponseEntity<?> descargarPdf(
             @RequestParam String idAdmision,
