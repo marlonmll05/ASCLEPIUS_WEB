@@ -1,18 +1,11 @@
 package com.certificadosapi.certificados.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import com.certificadosapi.certificados.config.DatabaseConfig;
 import com.certificadosapi.certificados.service.AlmacenService;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import java.math.BigDecimal;
-import java.sql.*;
 import java.time.LocalDate;
 
 @RestController
@@ -20,12 +13,10 @@ import java.time.LocalDate;
 @CrossOrigin(origins = "*")
 public class AlmacenController {
 
-    private final DatabaseConfig databaseConfig;
     private final AlmacenService almacenService;
 
     @Autowired 
-    public AlmacenController(DatabaseConfig databaseConfig, AlmacenService almacenService){
-        this.databaseConfig = databaseConfig;
+    public AlmacenController(AlmacenService almacenService){
         this.almacenService = almacenService;
     }
 
