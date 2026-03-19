@@ -797,8 +797,17 @@ document.getElementById('filtrosForm').addEventListener('submit', function (e) {
     const headRow = document.createElement('tr');
 
     const thCheckbox = document.createElement('th');
-    thCheckbox.textContent = 'Seleccionar';
+    const selectAllInput = document.createElement("input");
+    selectAllInput.type = "checkbox";
+    selectAllInput.id = "selectAll";
+
+    thCheckbox.appendChild(selectAllInput);
     headRow.appendChild(thCheckbox);
+
+    selectAllInput.addEventListener("change", function () {
+    const checkboxes = document.querySelectorAll(".checkbox-row");
+    checkboxes.forEach((cb) => (cb.checked = this.checked));
+    });
 
     camposMostrarGlobal.forEach(h => {
         const th = document.createElement('th');
@@ -1152,7 +1161,7 @@ exportarCuentaCobroSwitch.addEventListener('change', function() {
 });
 
 /**
- * Evento para exportar
+ * EVENTO PARA EXPORTAR POR LOTES
  */
 document.getElementById('btnExportar').addEventListener('click', async (event) => {
     const exportarPorCuenta = document.getElementById('exportarCuentaCobro').checked;
