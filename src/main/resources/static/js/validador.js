@@ -2635,12 +2635,146 @@ function verificarCheckboxes() {
     const checkboxes = document.querySelectorAll('.filaCheckbox');
     const descargarPaquetesBtn = document.getElementById('DescargarPaquetesBtn');
     const enviarPaquetesBtn = document.getElementById('enviarPaquetesBtn');
-
+    const ValidarCuvBtn = document.getElementById('ValidarCuvBtn')
+    
     const cantidadSeleccionados = Array.from(checkboxes).filter(checkbox => checkbox.checked).length;
+
+    document.getElementById("contadorSeleccionados").textContent = `SELECCIONADO: ${cantidadSeleccionados}`;
 
     descargarPaquetesBtn.disabled = cantidadSeleccionados < 2; 
 
     enviarPaquetesBtn.disabled = cantidadSeleccionados < 2;
+
+    ValidarCuvBtn.disabled = cantidadSeleccionados < 1;
+}
+
+/**
+ * Valida el Código Único de Validación (CUV) de las facturas seleccionadas
+ * contra la API del validador y guarda la respuesta en base de datos.
+ *
+ * Itera sobre cada fila seleccionada, envía el CUV a /api/validador/consultar-cuv
+ * y si la respuesta es exitosa, persiste el resultado en /api/validador/actualizar-respuesta.
+ *
+ * @throws Muestra toast de error por cada CUV que falle, sin interrumpir los demás.
+ */
+async function ValidarCuv() {
+    console.log("=== ValidarCuv ejecutada ===");
+    const checkboxes = document.querySelectorAll(".filaCheckbox:checked");
+
+    if (checkboxes.length === 0) {
+    showToast(
+        "Error",
+        "No hay filas seleccionadas para validar CUV",
+        "error",
+    );
+    return;
+    }
+
+    const botonValidar = document.getElementById("ValidarCuvBtn");
+    let originalHTML = botonValidar.innerHTML;
+    botonValidar.disabled = true;
+    botonValidar.innerHTML = "Validando...";
+    botonValidar.style.opacity = "0.6";
+    botonValidar.style.cursor = "not-allowed";
+
+    try {
+    const documentos = Array.from(checkboxes).map((cb) => {
+        const fila = cb.closest("tr");
+        const cuv = fila.querySelector(".valor-cuv")?.textContent.trim();
+        const nFact = fila
+        .querySelector("td:nth-child(2)")
+        .textContent.trim();
+        return { cuv, nFact };
+    });
+
+    let errores = [];
+
+    for (const doc of documentos) {
+        try {
+        const response = await fetch(
+          `https://${host}:9876/api/validador/consultar-cuv`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+            },
+            body: JSON.stringify({ codigoUnicoValidacion: doc.cuv }),
+          },
+        );
+
+        const text = await response.text();
+
+        if (!response.ok) {
+            errores.push({ cuv: doc.cuv, error: text });
+            console.error(`Error validando CUV ${doc.cuv}:`, text)
+            showToast(
+                "Error",
+                `Factura ${doc.nFact}: ${text}`, 
+                "error",
+            );
+        } else {
+            showToast(
+            "Éxito",
+            `CUV de Factura ${doc.nFact} validado correctamente`,
+            "success",
+            );
+            console.log(`Respuesta para ${doc.cuv}:`, text);
+
+            const guardarResp = await fetch(
+              `https://${host}:9876/api/validador/actualizar-respuesta`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+                },
+                body: JSON.stringify({
+                  nFact: doc.nFact,
+                  mensajeRespuesta: JSON.stringify(JSON.parse(text), null, 2),
+                }),
+              },
+            );
+
+            const guardarRespText = await guardarResp.text();
+
+            if (!guardarResp.ok) {
+            console.warn(`No se guardó respuesta para ${doc.nFact}: ${guardarRespText}`);
+            } else {
+            if (guardarRespText.includes("No se encontró registro")) {
+                showToast(
+                "Error",
+                `Factura ${doc.nFact}: ${guardarRespText}`,
+                "error",
+                );
+            } else {
+                console.log(`Guardado en BD para ${doc.nFact}`);
+            }
+            }
+        }
+        } catch (err) {
+        errores.push({ cuv: doc.cuv, error: err.message });
+        showToast(
+            "Error",
+            `Fallo en la solicitud para Factura ${doc.nFact}`,
+            "error",
+        );
+        }
+    }
+
+    if (errores.length === 0) {
+        showToast(
+        "Éxito",
+        "Todos los CUVs se procesaron correctamente",
+        "success",
+        );
+    }
+    } finally {
+    botonValidar.disabled = false;
+    botonValidar.innerHTML = originalHTML;
+    botonValidar.style.opacity = "1";
+    botonValidar.style.cursor = "pointer";
+    }
 }
 
 

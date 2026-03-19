@@ -1,7 +1,10 @@
 package com.certificadosapi.certificados.service;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,8 +17,13 @@ import org.springframework.http.*;
 
 import com.certificadosapi.certificados.config.DatabaseConfig;
 import com.certificadosapi.certificados.util.ServidorUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.sql.*;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+
+import com.fasterxml.jackson.core.type.TypeReference;
 
 
 /**
@@ -287,6 +295,126 @@ public class ValidadorService {
         } catch (SQLException e) {
             log.error("Error al guardar respuesta API para NFact={} Detalle={}", nFact, e.getMessage());
             throw new RuntimeException("Error al guardar respuesta: " + e.getMessage(), e);
+        }
+    }
+    
+
+    /**
+     * Guarda la respuesta de la API del ministerio (CUV) en la base de datos.
+     * Verifica que no exista un registro duplicado antes de insertar.
+     * 
+     * @param nFact Número de factura asociado a la respuesta
+     * @param mensajeRespuesta Mensaje de respuesta del ministerio (contiene el CUV)
+     * @return String confirmando que la respuesta fue guardada correctamente
+     * @throws IllegalArgumentException si alguno de los parámetros es nulo o vacío
+     * @throws IllegalStateException si ya existe un registro para el número de factura proporcionado
+     * @throws RuntimeException si ocurre un error SQL durante el guardado
+     */
+    public String actualizarRespuestaApi(String nFact, String mensajeRespuesta) {
+        
+        if (nFact == null || nFact.isEmpty())
+            throw new IllegalArgumentException("El parámetro 'nFact' es requerido");
+        if (mensajeRespuesta == null || mensajeRespuesta.isEmpty())
+            throw new IllegalArgumentException("El parámetro 'mensajeRespuesta' es requerido");
+
+        log.info("Actualizando respuesta API para NFact={}", nFact);
+
+        try {
+            String connectionUrl = databaseConfig.getConnectionUrl("IPSoft100_ST");
+
+            // Solo actualiza si el registro existe Y tiene 'false' en MensajeRespuesta
+            String updateSql = "UPDATE RIPS_RespuestaAPI SET MensajeRespuesta = ? WHERE Nfact = ? AND MensajeRespuesta LIKE '%false%'";
+
+            try (Connection conn = DriverManager.getConnection(connectionUrl);
+                PreparedStatement stmt = conn.prepareStatement(updateSql)) {
+
+                stmt.setString(1, mensajeRespuesta);
+                stmt.setString(2, nFact);
+
+                int rowsAffected = stmt.executeUpdate();
+
+                if (rowsAffected == 0) {
+                    log.warn("No se actualizó ningún registro para NFact={} (no existe o no tiene false)", nFact);
+                    return "No se encontró registro con respuesta para actualizar";
+                }
+
+                log.info("Respuesta API actualizada exitosamente para NFact={}", nFact);
+                return "Respuesta actualizada correctamente";
+            }
+
+        } catch (SQLException e) {
+            log.error("Error al actualizar respuesta API para NFact={} Detalle={}", nFact, e.getMessage());
+            throw new RuntimeException("Error al actualizar respuesta: " + e.getMessage(), e);
+        }
+    }
+
+    
+    /**
+     * Consulta el estado de validación de una factura electrónica en la API Docker
+     * mediante el Código Único de Validación (CUV).
+     *
+     * Envía el CUV a la API externa ConsultarCUV, procesa la respuesta
+     * y retorna un JSON formateado con los datos relevantes de la validación.
+     *
+     * @param cuv         Mapa con el cuerpo de la solicitud. Debe contener la clave
+     *                    "codigoUnicoValidacion" con el CUV de la factura.
+     * @param bearerToken Token de autorización en formato "Bearer token"
+     *                    que se reenvía a la API externa.
+     * @return JSON formateado con los campos: ResultState, ProcesoId, NumFactura,
+     *         CodigoUnicoValidacion, FechaRadicacion, RutaArchivos, Ambiente, Modulo,
+     *         ModalidadPago, PeriodoAtencion, ResultadosValidacion.
+     * @throws RuntimeException si EsValido es false en la respuesta de la API Docker,
+     *                          o si la respuesta no puede ser procesada.
+     */
+    public String consultarCuv(Map<String, String> cuv, String bearerToken) {
+        try {
+            RestTemplate restTemplate = servidorUtil.crearRestTemplateInseguro();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("Authorization", bearerToken);
+
+            HttpEntity<Map<String, String>> entidad = new HttpEntity<>(cuv, headers);
+
+            String urlApiDocker = "https://localhost:9443/api/ConsultasFevRips/ConsultarCUV";
+
+            ResponseEntity<String> respuesta = restTemplate.postForEntity(urlApiDocker, entidad, String.class);
+
+            ObjectMapper mapper = new ObjectMapper();
+            String rawBody = respuesta.getBody();
+
+            String fecha = LocalDate.now().atStartOfDay().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+
+            Map<String, Object> original = mapper.readValue(rawBody, new TypeReference<Map<String, Object>>() {});
+
+            Object esValido = original.get("EsValido");
+            if (Boolean.FALSE.equals(esValido)) {
+                throw new RuntimeException("La Api Docker esta presentando problemas");
+            }
+
+            Map<String, Object> personalizado = new LinkedHashMap<>();
+            Map<String, Object> personalizadoHijo = new LinkedHashMap<>();
+            personalizadoHijo.put("FechaInicio", fecha);
+            personalizadoHijo.put("FechaFinal", fecha);
+
+            personalizado.put("ResultState", original.get("EsValido"));
+            personalizado.put("ProcesoId", original.get("ProcesoId"));
+            personalizado.put("NumFactura", original.get("NumeroDocumento"));
+            personalizado.put("CodigoUnicoValidacion", original.get("CodigoUnicoValidacion"));
+            personalizado.put("FechaRadicacion", original.get("FechaValidacion"));
+            personalizado.put("RutaArchivos", null);
+            personalizado.put("Ambiente", "DockerProduction");
+            personalizado.put("Modulo", "FacturaElectronica");
+            personalizado.put("ModalidadPago", "Pago por evento.");
+            personalizado.put("PeriodoAtencion", personalizadoHijo);
+            personalizado.put("ResultadosValidacion", new ArrayList<>());
+
+            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(personalizado);
+
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("Respuesta inválida desde API externa: " + e.getMessage(), e);
         }
     }
 }
