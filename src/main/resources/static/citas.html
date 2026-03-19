@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Citas Médicas - Mejorado</title>
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+    <!-- Flatpickr -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_blue.css">
+
+    <style>
+        :root {
+            --primary-color: #0d6efd;
+            --success-color: #198754;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+        }
+
+        body {
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .main-container {
+            max-width: 80%;
+            margin: 0 auto;
+        }
+
+        .header-section {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+
+        .header-section h1 {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            margin-bottom: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+
+        .card-header-custom {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            padding: 1.2rem;
+            font-weight: 600;
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        .step {
+            flex: 1;
+            text-align: center;
+            position: relative;
+        }
+
+        .step-circle {
+            width: 40px;
+            height: 40px;
+            background: #e9ecef;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .step.active .step-circle {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: scale(1.1);
+        }
+
+        .step.completed .step-circle {
+            background: #198754;
+            color: white;
+        }
+
+        .step-line {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            right: -50%;
+            height: 2px;
+            background: #e9ecef;
+            z-index: -1;
+        }
+
+        .step.completed .step-line {
+            background: #198754;
+        }
+
+        .step:last-child .step-line {
+            display: none;
+        }
+
+        .hora-btn {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hora-btn.ocupado {
+            background-color: #dc3545 !important;
+            border-color: #dc3545 !important;
+            color: white !important;
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .hora-btn.disponible:hover {
+            transform: scale(1.05);
+        }
+
+        .especialidad-card {
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .especialidad-card:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-3px);
+        }
+
+        .especialidad-card.selected {
+            border-color: var(--success-color);
+            background-color: #d1e7dd;
+        }
+
+        .badge-custom {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        .resumen-cita {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 10px;
+            padding: 1.5rem;
+        }
+
+        .resumen-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .resumen-item:last-child {
+            border-bottom: none;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+
+        .btn-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .btn-gradient:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+<div class="toast-container"></div>
+
+<div class="container py-4 main-container">
+    
+    <!-- Header -->
+    <div class="header-section fade-in">
+        <h1><i class="bi bi-hospital-fill"></i> AGENDA TU CITA MÉDICA</h1>
+        <p class="text-muted mb-0">Sistema inteligente de reserva de citas</p>
+    </div>
+
+    <!-- Indicador de Pasos -->
+    <div class="step-indicator fade-in">
+        <div class="step active" id="step1">
+            <div class="step-circle">1</div>
+            <div class="step-line"></div>
+            <small>Identificación</small>
+        </div>
+        <div class="step" id="step2">
+            <div class="step-circle">2</div>
+            <div class="step-line"></div>
+            <small>Especialidad</small>
+        </div>
+        <div class="step" id="step3">
+            <div class="step-circle">3</div>
+            <div class="step-line"></div>
+            <small>Fecha y Hora</small>
+        </div>
+        <div class="step" id="step4">
+            <div class="step-circle">4</div>
+            <div class="step-line"></div>
+            <small>Datos</small>
+        </div>
+        <div class="step" id="step5">
+            <div class="step-circle">5</div>
+            <small>Confirmación</small>
+        </div>
+    </div>
+
+    <!-- PASO 1: Identificación -->
+    <div class="card fade-in" id="cardIdentificacion">
+        <div class="card-header-custom">
+            <i class="bi bi-person-badge"></i> Paso 1: Identificación del Paciente
+        </div>
+        <div class="card-body">
+            <form id="formIdentificacion">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="tipoDocumento" class="form-label">Tipo de Documento</label>
+                        <select class="form-select" id="tipoDocumento" required>
+                            <option value="">Seleccionar...</option>
+                            <option value="CC">Cédula de Ciudadanía</option>
+                            <option value="TI">Tarjeta de Identidad</option>
+                            <option value="CE">Cédula de Extranjería</option>
+                            <option value="PS">Pasaporte</option>
+                        </select>
+                    </div>
+                    <div class="col-md-8 mb-3">
+                        <label for="numeroDocumento" class="form-label">Número de Documento</label>
+                        <input type="text" class="form-control" id="numeroDocumento" 
+                               placeholder="Ingrese su número de documento" required
+                               pattern="[0-9]{6,12}">
+                        <div class="invalid-feedback">
+                            Ingrese un número válido (6-12 dígitos)
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-gradient w-100">
+                    <i class="bi bi-arrow-right-circle"></i> Continuar
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- PASO 2: Especialidades -->
+    <div class="card d-none fade-in" id="cardEspecialidad">
+        <div class="card-header-custom">
+            <i class="bi bi-clipboard2-pulse"></i> Paso 2: Selecciona la Especialidad Médica
+        </div>
+        <div class="card-body">
+            <div class="row" id="especialidadesContainer">
+                <!-- Las especialidades se cargarán dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- PASO 3: Médico -->
+    <div class="card d-none fade-in" id="cardMedico">
+        <div class="card-header-custom">
+            <i class="bi bi-person-circle"></i> Paso 3: Selecciona el Médico
+        </div>
+        <div class="card-body">
+            <div class="row" id="medicosContainer">
+                <!-- Se cargan dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    
+    <!-- PASO 3: IPS -->
+    <div class="card d-none fade-in" id="cardIPS">
+        <div class="card-header-custom">
+            <i class="bi bi-hospital"></i> Paso 3: Selecciona la IPS
+        </div>
+        <div class="card-body">
+            <div class="row" id="ipsContainer">
+                <!-- Se cargan dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- PASO 3: Fecha y Hora -->
+    <div class="card d-none fade-in" id="cardFechaHora">
+        <div class="card-header-custom">
+            <i class="bi bi-calendar-event"></i> Paso 3: Selecciona Fecha y Hora
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="fechaCita" class="form-label">
+                        <i class="bi bi-calendar3"></i> Fecha de la Cita
+                    </label>
+                    <input type="text" id="fechaCita" class="form-control" 
+                           placeholder="📅 Selecciona una fecha" readonly>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">
+                        <i class="bi bi-info-circle"></i> Información
+                    </label>
+                    <div class="alert alert-info mb-0">
+                        <small>
+                            <i class="bi bi-check-circle"></i> Verde: Disponible<br>
+                            <i class="bi bi-x-circle"></i> Rojo: Ocupado
+                        </small>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="seccionHoras" class="d-none">
+                <label class="form-label">
+                    <i class="bi bi-clock"></i> Horarios Disponibles
+                </label>
+                <div id="contenedorHoras" class="d-grid gap-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PASO 4: Datos del Paciente -->
+    <div class="card d-none fade-in" id="cardDatos">
+        <div class="card-header-custom">
+            <i class="bi bi-person-lines-fill"></i> Paso 4: Completa tus Datos
+        </div>
+        <div class="card-body">
+            <form id="formDatos">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="datosNombre" class="form-label">Nombre(s)</label>
+                        <input type="text" class="form-control" id="datosNombre" 
+                               placeholder="Ingrese su nombre" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="datosApellido" class="form-label">Apellido(s)</label>
+                        <input type="text" class="form-control" id="datosApellido" 
+                               placeholder="Ingrese su apellido" required>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="datosEdad" class="form-label">Edad</label>
+                        <input type="number" class="form-control" id="datosEdad" 
+                               placeholder="Edad" min="1" max="120" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="datosTelefono" class="form-label">Teléfono</label>
+                        <input type="tel" class="form-control" id="datosTelefono" 
+                               placeholder="3001234567" pattern="[0-9]{10}" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="datosEmail" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="datosEmail" 
+                               placeholder="email@ejemplo.com" required>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="datosMotivo" class="form-label">Motivo de la Consulta</label>
+                    <textarea class="form-control" id="datosMotivo" rows="3" 
+                              placeholder="Describa brevemente el motivo de su consulta" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-gradient w-100">
+                    <i class="bi bi-check-circle"></i> Continuar a Confirmación
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- PASO 5: Confirmación -->
+    <div class="card d-none fade-in" id="cardConfirmacion">
+        <div class="card-header-custom">
+            <i class="bi bi-check2-square"></i> Paso 5: Confirma tu Cita
+        </div>
+        <div class="card-body">
+            <div class="resumen-cita" id="resumenCita">
+                <!-- El resumen se cargará dinámicamente -->
+            </div>
+            
+            <div class="d-grid gap-2 mt-4">
+                <button class="btn btn-success btn-lg" id="btnConfirmarCita">
+                    <i class="bi bi-check-circle-fill"></i> Confirmar Cita Médica
+                </button>
+                <button class="btn btn-outline-secondary" id="btnNuevaCita">
+                    <i class="bi bi-arrow-clockwise"></i> Agendar Nueva Cita
+                </button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Flatpickr -->
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+
+<script>
+
+const host = window.location.hostname;
+let IdEspecialidad = null;
+// ============================================
+// DATOS Y CONFIGURACIÓN
+// ============================================
+
+const especialidades = [
+    { id: 1, nombre: 'Medicina General', icon: 'bi-heart-pulse', color: '#0d6efd' },
+    { id: 2, nombre: 'Odontología', icon: 'bi-teeth', color: '#198754' },
+    { id: 3, nombre: 'Pediatría', icon: 'bi-emoji-smile', color: '#ffc107' },
+    { id: 4, nombre: 'Ginecología', icon: 'bi-gender-female', color: '#d63384' },
+    { id: 5, nombre: 'Cardiología', icon: 'bi-heart', color: '#dc3545' },
+    { id: 6, nombre: 'Dermatología', icon: 'bi-bandaid', color: '#fd7e14' }
+];
+
+// Simulación de citas ocupadas (en producción vendría de una API)
+const citasOcupadas = [
+    { fecha: '2026-02-04', hora: '9:00 AM', especialidad: 1 },
+    { fecha: '2026-02-04', hora: '10:00 AM', especialidad: 1 },
+    { fecha: '2026-02-05', hora: '2:00 PM', especialidad: 2 },
+];
+
+let datosFormulario = {
+    tipoDocumento: '',
+    numeroDocumento: '',
+    especialidad: null,
+    fecha: '',
+    hora: '',
+    nombre: '',
+    apellido: '',
+    edad: '',
+    telefono: '',
+    email: '',
+    motivo: ''
+};
+
+// ============================================
+// FUNCIONES DE UTILIDAD
+// ============================================
+
+function mostrarToast(mensaje, tipo = 'success') {
+    const toastHtml = `
+        <div class="toast align-items-center text-white bg-${tipo} border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="bi bi-${tipo === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i>
+                    ${mensaje}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+    
+    const container = document.querySelector('.toast-container');
+    container.insertAdjacentHTML('beforeend', toastHtml);
+    const toastElement = container.lastElementChild;
+    const toast = new bootstrap.Toast(toastElement);
+    toast.show();
+    
+    toastElement.addEventListener('hidden.bs.toast', () => toastElement.remove());
+}
+
+function actualizarPasos(pasoActual) {
+    for (let i = 1; i <= 5; i++) {
+        const step = document.getElementById(`step${i}`);
+        step.classList.remove('active', 'completed');
+        
+        if (i < pasoActual) {
+            step.classList.add('completed');
+        } else if (i === pasoActual) {
+            step.classList.add('active');
+        }
+    }
+}
+
+function scrollToCard(card) {
+    setTimeout(() => {
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+}
+
+function verificarDisponibilidad(fecha, hora, especialidadId) {
+    return !citasOcupadas.some(cita => 
+        cita.fecha === fecha && 
+        cita.hora === hora && 
+        cita.especialidad === especialidadId
+    );
+}
+
+// ============================================
+// PASO 1: IDENTIFICACIÓN
+// ============================================
+
+document.getElementById('formIdentificacion').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    if (!this.checkValidity()) {
+        this.classList.add('was-validated');
+        return;
+    }
+    
+    datosFormulario.tipoDocumento = document.getElementById('tipoDocumento').value;
+    datosFormulario.numeroDocumento = document.getElementById('numeroDocumento').value;
+    
+    // Mostrar card de especialidades
+    const cardEsp = document.getElementById('cardEspecialidad');
+    cardEsp.classList.remove('d-none');
+    cargarEspecialidades();
+    actualizarPasos(2);
+    scrollToCard(cardEsp);
+    
+    mostrarToast('Identificación registrada correctamente');
+});
+
+// ============================================
+// PASO 2: ESPECIALIDADES
+// ============================================
+
+async function cargarEspecialidades() {
+    const container = document.getElementById('especialidadesContainer');
+    container.innerHTML = '<p class="text-muted">Cargando especialidades...</p>';
+
+
+    try {
+        const resp = await fetch(`https://${host}:9876/citas/agenda-tablas?idTabla=3`);
+        const especialidadesList = await resp.json();
+
+        container.innerHTML = '';
+
+        especialidadesList.forEach(esp => {
+            const col = document.createElement('div');
+
+            col.className = 'col-md-2 col-sm-6 mb-3';
+            col.innerHTML = `
+                <div class="card especialidad-card h-100 text-center" data-id="${esp.CodEspecialidad}">
+                    <div class="card-body">
+                        <i class="bi bi-clipboard2-pulse" style="font-size: 3rem; color: #0d6efd;"></i>
+                        <h6 class="mt-3">${esp.NomEspecialidad}</h6>
+                    </div>
+                </div>
+            `;
+            container.appendChild(col);
+        });
+
+        document.querySelectorAll('.especialidad-card').forEach(card => {
+            card.addEventListener('click', function() {
+                document.querySelectorAll('.especialidad-card').forEach(c => c.classList.remove('selected'));
+                this.classList.add('selected');
+
+                datosFormulario.especialidad = {
+                    id: this.dataset.id,
+                    nombre: this.querySelector('h6').textContent
+                };
+
+                cargarMedicos(this.dataset.id);
+                console.log(this.dataset.id);
+                mostrarToast(`Especialidad seleccionada: ${datosFormulario.especialidad.nombre}`);
+            });
+        });
+
+    } catch (err) {
+        container.innerHTML = `<p class="text-danger">Error cargando especialidades: ${err.message}</p>`;
+    }
+}
+// ============================================
+// PASO 3: FECHA Y HORA
+// ============================================
+
+const fechaPicker = flatpickr('#fechaCita', {
+    locale: 'es',
+    minDate: 'today',
+    maxDate: new Date().fp_incr(30), // 30 días adelante
+    disable: [
+        function(date) {
+            // Deshabilitar domingos (0 = domingo)
+            return (date.getDay() === 0);
+        }
+    ],
+    onChange: function(selectedDates, dateStr) {
+        if (selectedDates.length > 0) {
+            const fecha = selectedDates[0];
+            datosFormulario.fecha = formatearFecha(fecha);
+            mostrarHorarios(datosFormulario.fecha);
+        }
+    }
+});
+
+function formatearFecha(fecha) {
+    const year = fecha.getFullYear();
+    const month = String(fecha.getMonth() + 1).padStart(2, '0');
+    const day = String(fecha.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function mostrarHorarios(fechaSeleccionada) {
+    const seccion = document.getElementById('seccionHoras');
+    seccion.classList.remove('d-none');
+    
+    const contenedor = document.getElementById('contenedorHoras');
+    contenedor.innerHTML = '';
+    
+    const horarios = [
+        '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM',
+        '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM'
+    ];
+    
+    horarios.forEach(hora => {
+        const disponible = verificarDisponibilidad(
+            fechaSeleccionada, 
+            hora, 
+            datosFormulario.especialidad.id
+        );
+        
+        const boton = document.createElement('button');
+        boton.type = 'button';
+        boton.className = `btn hora-btn ${disponible ? 'btn-outline-success disponible' : 'btn-danger ocupado'}`;
+        boton.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <span>${hora}</span>
+                <span>
+                    ${disponible ? 
+                        '<i class="bi bi-check-circle-fill text-success"></i>' : 
+                        '<i class="bi bi-x-circle-fill"></i> Ocupado'}
+                </span>
+            </div>
+        `;
+        
+        if (disponible) {
+            boton.addEventListener('click', function() {
+                document.querySelectorAll('.hora-btn.disponible').forEach(b => {
+                    b.classList.remove('btn-success', 'active');
+                    b.classList.add('btn-outline-success');
+                });
+                this.classList.remove('btn-outline-success');
+                this.classList.add('btn-success', 'active');
+                
+                datosFormulario.hora = hora;
+                
+                // Mostrar card de datos
+                const cardDatos = document.getElementById('cardDatos');
+                cardDatos.classList.remove('d-none');
+                actualizarPasos(4);
+                scrollToCard(cardDatos);
+                
+                mostrarToast(`Hora seleccionada: ${hora}`);
+            });
+        }
+        
+        contenedor.appendChild(boton);
+    });
+}
+
+// ============================================
+// PASO 4: DATOS DEL PACIENTE
+// ============================================
+
+document.getElementById('formDatos').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    if (!this.checkValidity()) {
+        this.classList.add('was-validated');
+        return;
+    }
+    
+    datosFormulario.nombre = document.getElementById('datosNombre').value;
+    datosFormulario.apellido = document.getElementById('datosApellido').value;
+    datosFormulario.edad = document.getElementById('datosEdad').value;
+    datosFormulario.telefono = document.getElementById('datosTelefono').value;
+    datosFormulario.email = document.getElementById('datosEmail').value;
+    datosFormulario.motivo = document.getElementById('datosMotivo').value;
+    
+    // Mostrar confirmación
+    mostrarResumen();
+    const cardConf = document.getElementById('cardConfirmacion');
+    cardConf.classList.remove('d-none');
+    actualizarPasos(5);
+    scrollToCard(cardConf);
+    
+    mostrarToast('Datos registrados correctamente');
+});
+
+// ============================================
+// PASO 5: CONFIRMACIÓN
+// ============================================
+
+function mostrarResumen() {
+    const resumen = document.getElementById('resumenCita');
+    const fechaFormateada = new Date(datosFormulario.fecha + 'T00:00:00').toLocaleDateString('es-ES', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+    
+    resumen.innerHTML = `
+        <h5 class="text-center mb-4"><i class="bi bi-clipboard-check"></i> Resumen de tu Cita</h5>
+        
+        <div class="resumen-item">
+            <strong><i class="bi bi-person-badge"></i> Paciente:</strong>
+            <span>${datosFormulario.nombre} ${datosFormulario.apellido}</span>
+        </div>
+        
+        <div class="resumen-item">
+            <strong><i class="bi bi-card-text"></i> Documento:</strong>
+            <span>${datosFormulario.tipoDocumento} ${datosFormulario.numeroDocumento}</span>
+        </div>
+        
+        <div class="resumen-item">
+            <strong><i class="bi bi-person"></i> Edad:</strong>
+            <span>${datosFormulario.edad} años</span>
+        </div>
+        
+        <div class="resumen-item">
+            <strong><i class="bi bi-telephone"></i> Teléfono:</strong>
+            <span>${datosFormulario.telefono}</span>
+        </div>
+        
+        <div class="resumen-item">
+            <strong><i class="bi bi-envelope"></i> Email:</strong>
+            <span>${datosFormulario.email}</span>
+        </div>
+        
+        <div class="resumen-item">
+            <strong><i class="bi bi-clipboard2-pulse"></i> Especialidad:</strong>
+            <span>${datosFormulario.especialidad.nombre}</span>
+        </div>
+
+        <div class="resumen-item">
+            <strong><i class="bi bi-hospital"></i> IPS:</strong>
+            <span>${datosFormulario.ips?.nombre ?? 'No seleccionada'}</span>
+        </div>
+
+        <div class="resumen-item">
+            <strong><i class="bi bi-person-circle"></i> Médico:</strong>
+            <span>${datosFormulario.medico?.nombre ?? 'No seleccionado'}</span>
+        </div>
+        
+        <div class="resumen-item">
+            <strong><i class="bi bi-calendar-event"></i> Fecha:</strong>
+            <span>${fechaFormateada}</span>
+        </div>
+        
+        <div class="resumen-item">
+            <strong><i class="bi bi-clock"></i> Hora:</strong>
+            <span>${datosFormulario.hora}</span>
+        </div>
+        
+        <div class="resumen-item">
+            <strong><i class="bi bi-chat-left-text"></i> Motivo:</strong>
+            <span>${datosFormulario.motivo}</span>
+        </div>
+        
+        <div class="alert alert-warning mt-4 mb-0">
+            <i class="bi bi-info-circle"></i> 
+            <strong>Importante:</strong> Por favor llega 15 minutos antes de tu cita con tu documento de identidad.
+        </div>
+    `;
+}
+
+document.getElementById('btnConfirmarCita').addEventListener('click', function() {
+    // Aquí iría la lógica para guardar en base de datos
+    
+    // Simular guardado
+    const nuevaCita = {
+        fecha: datosFormulario.fecha,
+        hora: datosFormulario.hora,
+        especialidad: datosFormulario.especialidad.id
+    };
+    citasOcupadas.push(nuevaCita);
+    
+    // Guardar en localStorage
+    localStorage.setItem('ultimaCita', JSON.stringify(datosFormulario));
+    
+    mostrarToast('¡Cita confirmada exitosamente! Recibirás un correo de confirmación.', 'success');
+    
+    // Deshabilitar botón
+    this.disabled = true;
+    this.innerHTML = '<i class="bi bi-check-all"></i> Cita Confirmada';
+});
+
+document.getElementById('btnNuevaCita').addEventListener('click', function() {
+    location.reload();
+});
+
+// ============================================
+// INICIALIZACIÓN
+// ============================================
+
+// Verificar si hay una cita previa guardada
+window.addEventListener('load', function() {
+    const citaPrevia = localStorage.getItem('ultimaCita');
+    if (citaPrevia) {
+        console.log('Cita previa encontrada:', JSON.parse(citaPrevia));
+    }
+});
+
+
+// Llama esto al seleccionar especialidad, reemplaza lo que muestra cardFechaHora
+async function cargarMedicos(IdEspecialidad) {
+    const container = document.getElementById('medicosContainer');
+    container.innerHTML = '<p class="text-muted">Cargando médicos...</p>';
+
+    const cardMedico = document.getElementById('cardMedico');
+    cardMedico.classList.remove('d-none');
+    actualizarPasos(3);
+    scrollToCard(cardMedico);
+
+    try {
+        const resp = await fetch(`https://${host}:9876/citas/agenda-tablas?idTabla=2&Id=${IdEspecialidad}`);
+        const medicos = await resp.json();
+
+        container.innerHTML = '';
+
+        medicos.forEach(medico => {
+            const col = document.createElement('div');
+            col.className = 'col-md-4 col-sm-6 mb-3';
+            col.innerHTML = `
+                <div class="card especialidad-card h-100 text-center medico-card" data-cod="${medico.CodMedico}">
+                    <div class="card-body">
+                        <i class="bi bi-person-circle" style="font-size: 3rem; color: #0d6efd;"></i>
+                        <h6 class="mt-3">${medico.NomRecurso}</h6>
+                    </div>
+                </div>
+            `;
+            container.appendChild(col);
+        });
+
+        document.querySelectorAll('.medico-card').forEach(card => {
+            card.addEventListener('click', function() {
+                document.querySelectorAll('.medico-card').forEach(c => c.classList.remove('selected'));
+                this.classList.add('selected');
+
+                datosFormulario.medico = {
+                    cod: this.dataset.cod,
+                    nombre: this.querySelector('h6').textContent
+                };
+
+                cargarIPS();
+
+                mostrarToast(`Médico seleccionado: ${datosFormulario.medico.nombre}`);
+            });
+        });
+
+    } catch (err) {
+        container.innerHTML = `<p class="text-danger">Error cargando médicos: ${err.message}</p>`;
+    }
+}
+
+async function cargarIPS() {
+    const container = document.getElementById('ipsContainer');
+    container.innerHTML = '<p class="text-muted">Cargando IPS...</p>';
+
+    const cardIPS = document.getElementById('cardIPS');
+    cardIPS.classList.remove('d-none');
+    actualizarPasos(3);
+    scrollToCard(cardIPS);
+
+    try {
+        const resp = await fetch(`https://${host}:9876/citas/agenda-tablas?idTabla=1`);
+        const ipsList = await resp.json();
+
+        container.innerHTML = '';
+
+        ipsList.forEach(ips => {
+            const col = document.createElement('div');
+            col.className = 'col-md-4 col-sm-6 mb-3';
+            col.innerHTML = `
+                <div class="card especialidad-card h-100 text-center ips-card" data-cod="${ips.CodIPS}">
+                    <div class="card-body">
+                        <i class="bi bi-hospital" style="font-size: 3rem; color: #198754;"></i>
+                        <h6 class="mt-3">${ips.NombreIPS}</h6>
+                    </div>
+                </div>
+            `;
+            container.appendChild(col);
+        });
+
+        document.querySelectorAll('.ips-card').forEach(card => {
+            card.addEventListener('click', function() {
+                document.querySelectorAll('.ips-card').forEach(c => c.classList.remove('selected'));
+                this.classList.add('selected');
+
+                datosFormulario.ips = {
+                    cod: this.dataset.cod,
+                    nombre: this.querySelector('h6').textContent
+                };
+
+                const cardFecha = document.getElementById('cardFechaHora');
+                cardFecha.classList.remove('d-none');
+                actualizarPasos(4);
+                scrollToCard(cardFecha);
+                
+
+                mostrarToast(`IPS seleccionada: ${datosFormulario.ips.nombre}`);
+            });
+        });
+
+    } catch (err) {
+        container.innerHTML = `<p class="text-danger">Error cargando IPS: ${err.message}</p>`;
+    }
+}
+
+</script>
+
+</body>
+</html>
