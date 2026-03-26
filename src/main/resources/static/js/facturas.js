@@ -297,7 +297,7 @@ document.getElementById('facturasForm').addEventListener('submit', async functio
             const data = await response.json();
 
             if (!response.ok) {
-                showToast('Error', typeof data === 'string' ? data : JSON.stringify(data), 'error');
+                showToast('Error', data.Error , 'error');
                 return;
             }
 

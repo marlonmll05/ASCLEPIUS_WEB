@@ -3,6 +3,7 @@ package com.certificadosapi.certificados.exception;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 import org.slf4j.Logger;
@@ -122,7 +123,7 @@ public class GlobalExceptionHandler {
      * @return HTTP 500 - Internal Server Error
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<String> handleGlobalException(
+    public ResponseEntity<Map<String, Object>> handleGlobalException(
             Exception ex, 
             WebRequest request) {
         
@@ -130,6 +131,6 @@ public class GlobalExceptionHandler {
                   ex.getClass().getName(), request.getDescription(false), ex.getMessage());
         
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body("Error inesperado: " + ex.getMessage());
+                .body(Map.of("Error", "Error Inesperado: " + ex.getMessage()));
     }
 }
