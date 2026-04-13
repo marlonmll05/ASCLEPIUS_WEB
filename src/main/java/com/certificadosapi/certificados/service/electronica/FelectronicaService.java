@@ -20,7 +20,6 @@ import org.springframework.http.*;
 
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.Base64;
 import java.util.HashMap;
@@ -132,16 +131,20 @@ public class FelectronicaService {
             throw new RuntimeException("Respuesta no exitosa del PAC: " + respuesta.getBody());
         }
 
+        log.info("Enviando Factura Electronica: " + respuesta.getBody());
+
         JsonNode jsonBody = mapper.readTree(respuesta.getBody());
 
         String message     = jsonBody.has("message") ? jsonBody.get("message").asText() : "";
         String statusCode  = jsonBody.path("ResponseDian").path("Envelope").path("Body")
                                 .path("SendBillSyncResponse").path("SendBillSyncResult").path("StatusCode").asText();
         String cufe        = jsonBody.has("cufe") ? jsonBody.get("cufe").asText() : "";
-        String qr          = jsonBody.has("QRStr") ? jsonBody.get("QRStr").asText() : "";
+        String qr      = String.format("https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey=%s", cufe);
 
         byte[] xmlBytesExitoso = Base64.getDecoder().decode(jsonBody.path("attacheddocument").asText());
-        byte[] byteQr          = qr.getBytes(StandardCharsets.UTF_8);
+
+        byte[] byteQr = servidorUtil.generarQrJpg(qr);
+        
         byte[] xmlBytes        = Base64.getDecoder().decode(jsonBody.path("invoicexml").asText());
 
         String erroresDian = extraerErroresDian(jsonBody);
@@ -154,11 +157,11 @@ public class FelectronicaService {
         }
 
         if (message.contains("Este documento ya fue enviado anteriormente") || erroresDian.contains("Documento procesado anteriormente")) {
-            String consultaBody = consultarPorCufe(IdMovDoc, cufe, headers, template, mapper);
-            return Map.of("statusCode", statusCode, "cufe", cufe, "consultaBody", consultaBody, "fueConsulta", true);
+            Map<String, Object> consultaBody = consultarPorCufe(IdMovDoc, cufe, headers, template, mapper);
+            return Map.of("statusCode", consultaBody.get("statusCodeValidado"), "cufe", consultaBody.get("cufe"), "consultaBody", consultaBody.get("body"), "fueConsulta", true);
         }
 
-        return Map.of("statusCode", statusCode, "cufe", cufe, "fueConsulta", false);
+        return Map.of("body", respuesta.getBody(), "statusCode", statusCode, "cufe", cufe, "fueConsulta", false);
     }
 
     /**
@@ -173,7 +176,7 @@ public class FelectronicaService {
      * @throws IllegalStateException si la consulta no retorna contenido o el status code está vacío.
      * @throws RuntimeException      si falla la comunicación con el PAC.
      */
-    private String consultarPorCufe(Integer IdMovDoc, String cufe, HttpHeaders headers, RestTemplate template, ObjectMapper mapper) throws Exception {
+    private Map<String, Object> consultarPorCufe(Integer IdMovDoc, String cufe, HttpHeaders headers, RestTemplate template, ObjectMapper mapper) throws Exception {
         ObjectNode consultaJson = mapper.createObjectNode();
         consultaJson.put("sendmail", true);
         consultaJson.put("sendmailtome", true);
@@ -204,11 +207,20 @@ public class FelectronicaService {
         }
 
         String qr      = String.format("https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey=%s", cufe);
-        byte[] qrBytes = qr.getBytes(StandardCharsets.UTF_8);
+        byte[] qrBytes = servidorUtil.generarQrJpg(qr);
 
-        actualizarFacturaMovimientos(3, xmlConsultaByte, qrBytes, cufe, IdMovDoc);
 
-        return consultaString;
+        if ("00".equals(statusCodeValidado)) {
+            actualizarFacturaMovimientos(3, xmlConsultaByte, qrBytes, cufe, IdMovDoc);
+        }
+
+
+        return Map.of(
+            "statusCodeValidado", statusCodeValidado,
+            "cufe", cufe,
+            "body", consultaString
+        );
+
     }
 
     // -------------------------------------------------------------------------
