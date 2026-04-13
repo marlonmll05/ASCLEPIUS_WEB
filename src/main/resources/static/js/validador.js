@@ -2690,7 +2690,14 @@ async function ValidarCuv() {
     let errores = [];
 
     for (const doc of documentos) {
-        try {
+
+      if (!doc.cuv) {
+        console.warn(`CUV vacío para factura ${doc.nFact}`);
+        showToast("Error", `Factura ${doc.nFact}: CUV vacío`, "error");
+        continue;
+      }
+
+      try {
         const response = await fetch(
           `https://${host}:9876/api/validador/consultar-cuv`,
           {
@@ -2699,67 +2706,87 @@ async function ValidarCuv() {
               "Content-Type": "application/json",
               Authorization: `Bearer ${sessionStorage.getItem("token")}`,
             },
-            body: JSON.stringify({ codigoUnicoValidacion: doc.cuv }),
+            body: JSON.stringify({
+              codigoUnicoValidacion: doc.cuv,
+            }),
           },
         );
 
         const text = await response.text();
 
         if (!response.ok) {
-            errores.push({ cuv: doc.cuv, error: text });
-            console.error(`Error validando CUV ${doc.cuv}:`, text)
-            showToast(
-                "Error",
-                `Factura ${doc.nFact}: ${text}`, 
-                "error",
-            );
+          let mensajeError = "Error desconocido";
+
+          try {
+            const json = JSON.parse(text);
+
+            if (
+              json.ResultadosValidacion &&
+              json.ResultadosValidacion.length > 0
+            ) {
+              mensajeError = json.ResultadosValidacion.map(
+                (r) => `${r.Descripcion} - ${r.Observaciones}`,
+              ).join(" | ");
+            }
+          } catch (e) {
+            mensajeError = text;
+          }
+
+          errores.push({ cuv: doc.cuv, error: mensajeError });
+
+          console.error(`Error validando CUV ${doc.cuv}:`, mensajeError);
+
+          showToast("Error", `Factura ${doc.nFact}: ${mensajeError}`, "error");
         } else {
-            showToast(
+          showToast(
             "Éxito",
             `CUV de Factura ${doc.nFact} validado correctamente`,
             "success",
-            );
-            console.log(`Respuesta para ${doc.cuv}:`, text);
+          );
 
-            const guardarResp = await fetch(
-              `https://${host}:9876/api/validador/actualizar-respuesta`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${sessionStorage.getItem("token")}`,
-                },
-                body: JSON.stringify({
-                  nFact: doc.nFact,
-                  mensajeRespuesta: JSON.stringify(JSON.parse(text), null, 2),
-                }),
+          console.log(`Respuesta para ${doc.cuv}:`, text);
+
+          const guardarResp = await fetch(
+            `https://${host}:9876/api/validador/actualizar-respuesta`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${sessionStorage.getItem("token")}`,
               },
+              body: JSON.stringify({
+                nFact: doc.nFact,
+                mensajeRespuesta: JSON.stringify(JSON.parse(text), null, 2),
+              }),
+            },
+          );
+
+          const guardarRespText = await guardarResp.text();
+
+          if (!guardarResp.ok) {
+            console.warn(
+              `No se guardó respuesta para ${doc.nFact}: ${guardarRespText}`,
             );
-
-            const guardarRespText = await guardarResp.text();
-
-            if (!guardarResp.ok) {
-            console.warn(`No se guardó respuesta para ${doc.nFact}: ${guardarRespText}`);
-            } else {
+          } else {
             if (guardarRespText.includes("No se encontró registro")) {
-                showToast(
+              showToast(
                 "Error",
                 `Factura ${doc.nFact}: ${guardarRespText}`,
                 "error",
-                );
+              );
             } else {
-                console.log(`Guardado en BD para ${doc.nFact}`);
+              console.log(`Guardado en BD para ${doc.nFact}`);
             }
-            }
+          }
         }
-        } catch (err) {
+      } catch (err) {
         errores.push({ cuv: doc.cuv, error: err.message });
         showToast(
             "Error",
             `Fallo en la solicitud para Factura ${doc.nFact}`,
             "error",
         );
-        }
+      }
     }
 
     if (errores.length === 0) {
