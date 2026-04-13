@@ -1,6 +1,7 @@
 package com.certificadosapi.certificados.service.electronica;
 
 import com.certificadosapi.certificados.config.DatabaseConfig;
+import com.certificadosapi.certificados.util.ServidorUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -10,23 +11,26 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
+import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.Base64;
 import java.util.Iterator;
 import java.util.Map;
 
+@Service
 public class NominaService {
 
     private static final Logger log = LoggerFactory.getLogger(NominaService.class);
 
     private final DatabaseConfig databaseConfig;
+    private final ServidorUtil servidorUtil;
 
     @Autowired
-    public NominaService(DatabaseConfig databaseConfig) {
+    public NominaService(DatabaseConfig databaseConfig, ServidorUtil servidorUtil) {
         this.databaseConfig = databaseConfig;
+        this.servidorUtil = servidorUtil;
     }
 
     // -------------------------------------------------------------------------
@@ -343,11 +347,13 @@ public class NominaService {
                 .path("SendNominaSyncResponse").path("SendNominaSyncResult").path("StatusCode").asText();
 
         String cune = jsonBody.has("cune") ? jsonBody.get("cune").asText() : "";
-        String qr   = jsonBody.has("QRStr") ? jsonBody.get("QRStr").asText() : "";
 
         String payrollxml = jsonBody.has("payrollxml") ? jsonBody.get("payrollxml").asText() : "";
         byte[] xmlBytes   = Base64.getDecoder().decode(payrollxml);
-        byte[] qrBytes    = qr.getBytes(StandardCharsets.UTF_8);
+
+        String qr       = String.format("https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey=%s", cune);
+        byte[] qrBytes  = servidorUtil.generarQrJpg(qr);
+
 
         log.info("[NominaService] Respuesta PAC - StatusCode={} CUNE={}", statusCode, cune);
         log.info("[NominaService] ErrorMessage DIAN: {}", errorMessage);
@@ -412,7 +418,8 @@ public class NominaService {
 
         byte[] xmlBytes = Base64.getDecoder().decode(payrollxml);
         String qr       = String.format("https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey=%s", cune);
-        byte[] qrBytes  = qr.getBytes(StandardCharsets.UTF_8);
+        byte[] qrBytes  = servidorUtil.generarQrJpg(qr);
+
 
         log.info("[NominaService] QR consulta generado: {}", qr);
 
