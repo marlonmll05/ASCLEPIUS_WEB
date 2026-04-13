@@ -322,24 +322,57 @@ public class ValidadorService {
         try {
             String connectionUrl = databaseConfig.getConnectionUrl("IPSoft100_ST");
 
-            // Solo actualiza si el registro existe Y tiene 'false' en MensajeRespuesta
+            String verifySql = "SELECT COUNT(*) FROM RIPS_RespuestaAPI WHERE Nfact = ?";
+            String insertSql = "INSERT INTO RIPS_RespuestaAPI (Nfact, MensajeRespuesta) VALUES (?, ?)";
             String updateSql = "UPDATE RIPS_RespuestaAPI SET MensajeRespuesta = ? WHERE Nfact = ? AND MensajeRespuesta LIKE '%false%'";
 
-            try (Connection conn = DriverManager.getConnection(connectionUrl);
-                PreparedStatement stmt = conn.prepareStatement(updateSql)) {
+            try (Connection conn = DriverManager.getConnection(connectionUrl)){
 
-                stmt.setString(1, mensajeRespuesta);
-                stmt.setString(2, nFact);
+                try (PreparedStatement verifyStatement = conn.prepareStatement(verifySql)){
+                    verifyStatement.setString(1, nFact);
 
-                int rowsAffected = stmt.executeUpdate();
+                    try (ResultSet rs = verifyStatement.executeQuery()){
+                        rs.next();
+                        
+                        int count = rs.getInt(1);
 
-                if (rowsAffected == 0) {
-                    log.warn("No se actualizó ningún registro para NFact={} (no existe o no tiene false)", nFact);
-                    return "No se encontró registro con respuesta para actualizar";
+                        if(count == 0){
+
+                            log.warn("No se encontró registro para NFact={} al intentar actualizar, insertando nuevo registro", nFact);
+
+                            try (PreparedStatement insertStatement = conn.prepareStatement(insertSql)){
+                                insertStatement.setString(1, nFact);
+                                insertStatement.setString(2, mensajeRespuesta);
+                                insertStatement.executeUpdate();
+
+                                log.info("Nuevo registro insertado exitosamente para NFact={}", nFact);
+
+                                return "Nuevo registro insertado correctamente";
+                            } catch (SQLException e) {
+                                log.error("Error al insertar nuevo registro para NFact={} Detalle={}", nFact, e.getMessage());
+                                throw new RuntimeException("Error al insertar nuevo registro: " + e.getMessage(), e);
+                            }
+                        }
+
+                    }
+                    
                 }
 
-                log.info("Respuesta API actualizada exitosamente para NFact={}", nFact);
-                return "Respuesta actualizada correctamente";
+                try(PreparedStatement stmt = conn.prepareStatement(updateSql)) {
+
+                    stmt.setString(1, mensajeRespuesta);
+                    stmt.setString(2, nFact);
+
+                    int rowsAffected = stmt.executeUpdate();
+
+                    if (rowsAffected == 0) {
+                        log.warn("No se actualizó ningún registro para NFact={} (no existe o no tiene false)", nFact);
+                        return "No se encontró registro con respuesta para actualizar";
+                    }
+
+                    log.info("Respuesta API actualizada exitosamente para NFact={}", nFact);
+                    return "Respuesta actualizada correctamente";
+                }
             }
 
         } catch (SQLException e) {
