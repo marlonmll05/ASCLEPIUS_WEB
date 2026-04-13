@@ -294,12 +294,16 @@ document.getElementById('facturasForm').addEventListener('submit', async functio
             showToast('Procesando', 'Buscando facturas...', 'success', 2000);
 
             const response = await fetch(`/filtros/facturas?${params.toString()}`);
-            const data = await response.json();
+
+            const text = await response.text();
+            
 
             if (!response.ok) {
-                showToast('Error', data.Error , 'error');
+                showToast('Error', text , 'error');
                 return;
             }
+
+            const data = JSON.parse(text);
 
             const tabla = document.getElementById('resultados');
             const head = document.getElementById('tablaHead');
@@ -790,7 +794,15 @@ async function descargarZip(id, tipo, xml, directoryHandle) {
 async function cargarTerceros() {
     try {
         const response = await fetch('/filtros/terceros');
-        const data = await response.json();
+        const text = await response.text();
+
+        if (!response.ok) {
+            showToast("Error", text, "error");
+            return;
+        }
+
+        const data = JSON.parse(text);
+
         const select = document.getElementById('idTercero');
 
         data.forEach(tercero => {
@@ -800,30 +812,46 @@ async function cargarTerceros() {
             select.appendChild(option);
         });
     } catch (error) {
-        showToast("Error", "Error al cargar terceros: " + error.message, 'error'); 
+        showToast("Error", "Error al cargar terceros: " + error, 'error'); 
     }
 }
 
 document.addEventListener('DOMContentLoaded', cargarTerceros);
 
-document.getElementById('idTercero').addEventListener('change', async function() {
+document
+  .getElementById("idTercero")
+  .addEventListener("change", async function () {
     const idTerceroKey = this.value;
-    const selectContratos = document.getElementById('noContrato');
-    selectContratos.innerHTML = '<option value="">Seleccione un contrato</option>';
+    const selectContratos = document.getElementById("noContrato");
+    selectContratos.innerHTML =
+      '<option value="">Seleccione un contrato</option>';
 
     if (idTerceroKey) {
-        try {
-            const response = await fetch(`/filtros/contratos?idTerceroKey=${idTerceroKey}`);
-            const data = await response.json();
+      try {
+        const response = await fetch(
+          `/filtros/contratos?idTerceroKey=${idTerceroKey}`,
+        );
+        const text = await response.text();
 
-            data.forEach(contrato => {
-                const option = document.createElement('option');
-                option.value = contrato.noContrato;
-                option.textContent = contrato.nomContrato;
-                selectContratos.appendChild(option);
-            });
-        } catch (error) {
-            showToast("Error", "Error al cargar contratos: " + error.message, 'error');
+        if (!response.ok) {
+          showToast("Error", text, "error");
+          return;
         }
+
+        const data = JSON.parse(text);
+
+        data.forEach((contrato) => {
+          const option = document.createElement("option");
+          option.value = contrato.noContrato;
+          option.textContent = contrato.nomContrato;
+          selectContratos.appendChild(option);
+        });
+      } catch (error) {
+        showToast(
+          "Error",
+          "Error al cargar contratos: " + error.message,
+          "error",
+        );
+      }
     }
-});
+  });
