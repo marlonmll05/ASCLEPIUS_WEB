@@ -1,9 +1,21 @@
 package com.certificadosapi.certificados.util;
 
+import java.io.ByteArrayOutputStream;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.sql.SQLException;
 import java.util.Arrays;
+
+
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.client.j2se.MatrixToImageWriter;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+
+
 
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
@@ -26,6 +38,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import com.certificadosapi.certificados.config.DatabaseConfig;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.client.j2se.MatrixToImageWriter;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
 
 @Component
 public class ServidorUtil {
@@ -96,6 +112,18 @@ public class ServidorUtil {
                 .setDefaultAuthSchemeRegistry(authSchemeRegistry)
                 .setDefaultRequestConfig(requestConfig)
                 .build();
+    }
+
+    public byte[] generarQrJpg(String contenido) throws Exception {
+        QRCodeWriter qrWriter = new QRCodeWriter();
+        BitMatrix matrix = qrWriter.encode(contenido, BarcodeFormat.QR_CODE, 300, 300);
+
+        BufferedImage image = MatrixToImageWriter.toBufferedImage(matrix);
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ImageIO.write(image, "JPG", baos);
+
+        return baos.toByteArray();
     }
     
 }
