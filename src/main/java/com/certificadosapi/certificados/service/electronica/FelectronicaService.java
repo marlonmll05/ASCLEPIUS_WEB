@@ -446,7 +446,7 @@ public class FelectronicaService {
                 if (xmlBytes == null || xmlBytes.length == 0) {
                     return null;
                 }
-                return Base64.getDecoder().decode(xmlBytes);
+                return xmlBytes;
             }
         }
     }
