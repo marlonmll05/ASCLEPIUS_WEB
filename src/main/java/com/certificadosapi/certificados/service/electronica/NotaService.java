@@ -20,6 +20,7 @@ import org.springframework.http.*;
 
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.Base64;
 import java.util.HashMap;
@@ -37,45 +38,75 @@ import org.springframework.stereotype.Service;
 import jakarta.mail.internet.MimeMessage;
 import org.springframework.core.io.ByteArrayResource;
 
+
 @Service
-public class FelectronicaService {
+public class NotaService {
 
     private final DatabaseConfig databaseConfig;
     private final ServidorUtil servidorUtil;
     private static final Logger log = LoggerFactory.getLogger(FelectronicaService.class);
 
     @Autowired
-    FelectronicaService(DatabaseConfig databaseConfig, ServidorUtil servidorUtil){
+    NotaService(DatabaseConfig databaseConfig, ServidorUtil servidorUtil){
         this.databaseConfig = databaseConfig;
         this.servidorUtil = servidorUtil;
     }
 
     // -------------------------------------------------------------------------
-    // GENERAR FACTURA ELECTRÓNICA
+    // GENERAR NOTA ELECTRÓNICA
     // -------------------------------------------------------------------------
 
     /**
-     * Obtiene la URL del PAC, el Bearer Token y el JSON de factura desde la base de datos.
+     * Obtiene la URL del PAC, el Bearer Token y el JSON de Nota desde la base de datos.
      *
      * @param IdMovDoc Identificador del movimiento documento.
      * @return Mapa con las claves "urlPac", "bearerToken" y "json".
      * @throws SQLException          si ocurre un error en la consulta.
      * @throws IllegalStateException si no se encuentra alguno de los valores requeridos.
      */
-    public Map<String, String> obtenerDatosFactura(Integer IdMovDoc) throws SQLException {
+    public Map<String, String> obtenerDatosNota(Integer IdMovDoc) throws SQLException {
 
         String urlPac;
 
-        try (Connection conn = DriverManager.getConnection(databaseConfig.getConnectionUrl("IPSoftFinanciero_ST"))) {
-            String sql = "SELECT ValorParametro FROM ParametrosServidor WHERE NomParametro = 'FE_ExtApi_URL'";
-            try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
-                if (!rs.next()) throw new IllegalStateException("No se encontró FE_ExtApi_URL en ParametrosServidor");
-                urlPac = rs.getString("ValorParametro");
+        try (Connection conn = DriverManager.getConnection(databaseConfig.getConnectionUrl("IPSoftFinanciero_ST"))){
+            
+            String tipoNotaSQL = "SELECT IdTipoDocFe FROM MovimientoDocumentos WHERE IdMovDoc = ?";
+
+            Integer tipoNota = null;
+
+            try (PreparedStatement ps = conn.prepareStatement(tipoNotaSQL)){
+                ps.setInt(1, IdMovDoc);
+                try (ResultSet rs = ps.executeQuery()){
+                    if (!rs.next()){
+                        throw new IllegalStateException("No se encontraron resultados para la consulta");
+                    }
+
+                    tipoNota = rs.getInt("IdTipoDocFe");
+                }
+            }
+
+            String sql = null;
+        
+            if (tipoNota == 2){
+                sql = "SELECT ValorParametro FROM ParametrosServidor WHERE NomParametro = 'FE_NCE_ExtApi_URL'";
+            }
+            else if (tipoNota == 3){
+                sql = "SELECT ValorParametro FROM ParametrosServidor WHERE NomParametro = 'FE_NDE_ExtApi_URL'";
+            }
+
+            try (PreparedStatement psUrl = conn.prepareStatement(sql); 
+                ResultSet rsUrl = psUrl.executeQuery()){
+                if (!rsUrl.next()){
+                    throw new IllegalStateException("No se encontró la URL en ParametrosServidor");
+                }
+                urlPac = rsUrl.getString("ValorParametro");
             }
         }
 
+
         String bearerToken;
         String json;
+
         String sqlToken = """
             SELECT ValorParametro FROM ParametrosServidor PS
             INNER JOIN DBO.Empresas E ON E.IdEmpresaGrupo = PS.IdEmpresaGrupo
@@ -92,39 +123,44 @@ public class FelectronicaService {
                 }
             }
 
-            try (CallableStatement stmt = conn.prepareCall("{call pa_FE_GenerarJSONFacturaDIAN(?)}")) {
+            try(CallableStatement stmt = conn.prepareCall("{call pa_FE_NE_GenerarJSON(?)}")){
                 stmt.setInt(1, IdMovDoc);
                 try (ResultSet rs = stmt.executeQuery()) {
-                    if (!rs.next()) throw new IllegalStateException("No se encontraron datos en pa_FE_GenerarJSONFacturaDIAN");
-                    json = rs.getString("JSONFactura");
+                    if (!rs.next()) throw new IllegalStateException("No se encontraron datos en pa_FE_NE_GenerarJSON");
+                    json = rs.getNString("JSONNota");
                     if (json == null) throw new IllegalStateException("El JSON retornado es NULL");
                 }
             }
         }
-
+            
         return Map.of("urlPac", urlPac, "bearerToken", bearerToken, "json", json);
     }
 
 
     /**
-     * Envía el JSON de factura al PAC y procesa la respuesta de la DIAN.
-     * Si el documento ya fue enviado anteriormente, consulta el estado por CUFE.
+     * Envía el JSON de Nota al PAC y procesa la respuesta de la DIAN.
+     * Si el documento ya fue enviado anteriormente, consulta el estado por CUDE.
      *
      * @param IdMovDoc    Identificador del movimiento documento.
-     * @param json        JSON de factura generado por el SP.
+     * @param json        JSON de Nota generado por el SP.
      * @param bearerToken Token de autenticación para el PAC.
      * @param urlEnvio    URL del endpoint del PAC.
-     * @return Mapa con los resultados: "statusCode", "cufe", y opcionalmente "consultaBody".
+     * @return Mapa con los resultados: "statusCode", "cude", y opcionalmente "consultaBody".
      * @throws RuntimeException si ocurre un error al enviar o procesar la respuesta.
      */
     public Map<String, Object> enviarAlPac(Integer IdMovDoc, String json, String bearerToken, String urlEnvio) throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         RestTemplate template = servidorUtil.crearRestTemplateInseguro();
 
+        log.info("Enviando Json al PAC: {}", json);
+
         HttpHeaders headers = construirHeaders(bearerToken);
-        log.info("Json a enviar al PAC: {}", json);
-        
+
+        json = new String(json.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
+        json = json.replaceAll("[\\p{Cntrl}&&[^\r\n]]", " ");
         HttpEntity<String> entity = new HttpEntity<>(json, headers);
+
+
 
         @SuppressWarnings("null")
         ResponseEntity<String> respuesta = template.postForEntity(urlEnvio, entity, String.class);
@@ -133,15 +169,17 @@ public class FelectronicaService {
             throw new RuntimeException("Respuesta no exitosa del PAC: " + respuesta.getBody());
         }
 
-        log.info("Enviando Factura Electronica: " + respuesta.getBody());
+        log.info("Enviando Nota: " + respuesta.getBody());
+
 
         JsonNode jsonBody = mapper.readTree(respuesta.getBody());
 
         String message     = jsonBody.has("message") ? jsonBody.get("message").asText() : "";
         String statusCode  = jsonBody.path("ResponseDian").path("Envelope").path("Body")
                                 .path("SendBillSyncResponse").path("SendBillSyncResult").path("StatusCode").asText();
-        String cufe        = jsonBody.has("cufe") ? jsonBody.get("cufe").asText() : "";
-        String qr      = String.format("https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey=%s", cufe);
+
+        String cude        = jsonBody.has("cude") ? jsonBody.get("cude").asText() : "";
+        String qr      = String.format("https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey=%s", cude);
 
         byte[] xmlBytesExitoso = Base64.getDecoder().decode(jsonBody.path("attacheddocument").asText());
 
@@ -152,51 +190,55 @@ public class FelectronicaService {
         String erroresDian = extraerErroresDian(jsonBody);
         log.info("Errores DIAN: {}", erroresDian);
 
-        insertarMovimientoFactura(IdMovDoc, erroresDian, xmlBytes);
+        insertarMovimientoNota(IdMovDoc, erroresDian, xmlBytes);
 
         if ("00".equals(statusCode)) {
-            actualizarFacturaMovimientos(3, xmlBytesExitoso, byteQr, cufe, IdMovDoc);
+            actualizarNotaMovimientos(3, xmlBytesExitoso, byteQr, cude, IdMovDoc);
         }
 
         if (message.contains("Este documento ya fue enviado anteriormente") || erroresDian.contains("Documento procesado anteriormente")) {
-            Map<String, Object> consultaBody = consultarPorCufe(IdMovDoc, cufe, headers, template, mapper);
-            return Map.of("statusCode", consultaBody.get("statusCodeValidado"), "cufe", consultaBody.get("cufe"), "consultaBody", consultaBody.get("body"), "fueConsulta", true);
+            Map<String, Object> consultaBody = consultarPorCude(IdMovDoc, cude, headers, template, mapper);
+            log.info("Resultado de consulta por CUDE: {}", consultaBody.get("body"));
+            return Map.of("statusCode", consultaBody.get("statusCodeValidado"), "cude", consultaBody.get("cude"), "consultaBody", consultaBody.get("body"), "fueConsulta", true);
         }
 
-        return Map.of("body", respuesta.getBody(), "statusCode", statusCode, "cufe", cufe, "fueConsulta", false);
+        log.info("Respuesta del PAC: {}", respuesta.getBody());
+        return Map.of("body", respuesta.getBody(), "statusCode", statusCode, "cude", cude, "fueConsulta", false);
     }
 
     /**
-     * Consulta el estado de una factura ya procesada por CUFE y actualiza la base de datos.
+     * Consulta el estado de una nota ya procesada por CUDE y actualiza la base de datos.
      *
      * @param IdMovDoc Identificador del movimiento documento.
-     * @param cufe     Código Único de Factura Electrónica.
+     * @param cude     Código Único de Nota Electrónica.
      * @param headers  Headers HTTP ya configurados con el token.
      * @param template RestTemplate para ejecutar la petición.
      * @param mapper   ObjectMapper para parsear la respuesta.
-     * @return Cuerpo de la respuesta de la consulta por CUFE.
+     * @return Cuerpo de la respuesta de la consulta por CUDE.
      * @throws IllegalStateException si la consulta no retorna contenido o el status code está vacío.
      * @throws RuntimeException      si falla la comunicación con el PAC.
      */
-    private Map<String, Object> consultarPorCufe(Integer IdMovDoc, String cufe, HttpHeaders headers, RestTemplate template, ObjectMapper mapper) throws Exception {
+    private Map<String, Object> consultarPorCude(Integer IdMovDoc, String cude, HttpHeaders headers, RestTemplate template, ObjectMapper mapper) throws Exception {
+        
         ObjectNode consultaJson = mapper.createObjectNode();
         consultaJson.put("sendmail", true);
         consultaJson.put("sendmailtome", true);
         consultaJson.put("is_payroll", false);
         consultaJson.put("is_eqdoc", false);
 
-        String urlConsulta = String.format("https://api.gihos-sas.com/api/ubl2.1/status/document/%s", cufe);
+        String urlConsulta = String.format("https://api.gihos-sas.com/api/ubl2.1/status/document/%s", cude);
         HttpEntity<String> consultaEntity = new HttpEntity<>(
             mapper.writerWithDefaultPrettyPrinter().writeValueAsString(consultaJson), headers
         );
 
-        log.info("Consultando por CUFE: {}", cufe);
+        log.info("Consultando por CUDE: {}", cude);
+
         @SuppressWarnings("null")
         ResponseEntity<String> respuestaConsulta = template.postForEntity(urlConsulta, consultaEntity, String.class);
 
         String consultaString = respuestaConsulta.getBody();
         if (consultaString == null || consultaString.isEmpty()) {
-            throw new IllegalStateException("La consulta por CUFE no retornó contenido");
+            throw new IllegalStateException("La consulta por CUDE no retornó contenido");
         }
 
         JsonNode consultaNode    = mapper.readTree(consultaString);
@@ -208,18 +250,18 @@ public class FelectronicaService {
             throw new IllegalStateException("El Status Code de la consulta está vacío");
         }
 
-        String qr      = String.format("https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey=%s", cufe);
+        String qr      = String.format("https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey=%s", cude);
         byte[] qrBytes = servidorUtil.generarQrJpg(qr);
 
 
         if ("00".equals(statusCodeValidado)) {
-            actualizarFacturaMovimientos(3, xmlConsultaByte, qrBytes, cufe, IdMovDoc);
+            actualizarNotaMovimientos(3, xmlConsultaByte, qrBytes, cude, IdMovDoc);
         }
 
 
         return Map.of(
             "statusCodeValidado", statusCodeValidado,
-            "cufe", cufe,
+            "cude", cude,
             "body", consultaString
         );
 
@@ -230,7 +272,7 @@ public class FelectronicaService {
     // -------------------------------------------------------------------------
 
     /**
-     * Descarga el PDF de una factura desde SSRS usando autenticación NTLM.
+     * Descarga el PDF de una nota desde SSRS usando autenticación NTLM.
      *
      * @param IdMovDoc Identificador del movimiento documento.
      * @param Url      URL base del reporte SSRS (puede contener espacios).
@@ -268,7 +310,7 @@ public class FelectronicaService {
     // -------------------------------------------------------------------------
 
     /**
-     * Genera un archivo ZIP en memoria con el XML y el PDF de la factura.
+     * Genera un archivo ZIP en memoria con el XML y el PDF de la nota.
      *
      * @param IdMovDoc Identificador del movimiento documento.
      * @param Url      URL base del reporte SSRS para descargar el PDF.
@@ -309,7 +351,7 @@ public class FelectronicaService {
     // -------------------------------------------------------------------------
 
     /**
-     * Envía por correo la factura como ZIP adjunto,
+     * Envía por correo la nota como ZIP adjunto,
      * configurando el SMTP desde los parámetros de la base de datos.
      *
      * @param IdMovDoc  Identificador del movimiento documento.
@@ -387,13 +429,13 @@ public class FelectronicaService {
      * Actualiza los campos de XML, QR y CUFE en MovimientoDocumentos.
      *
      * @param idDocXmlEnviadoDian Estado de envío a la DIAN.
-     * @param xmlBytes            XML de la factura electrónica en bytes.
+     * @param xmlBytes            XML de la nota electrónica en bytes.
      * @param qrBytes             Cadena QR en bytes.
-     * @param cufe                Código Único de Factura Electrónica.
+     * @param cude                Código Único de Nota Electrónica.
      * @param IdMovDoc            Identificador del movimiento documento.
      * @throws SQLException si ocurre un error al ejecutar el UPDATE.
      */
-    private void actualizarFacturaMovimientos(Integer idDocXmlEnviadoDian, byte[] xmlBytes, byte[] qrBytes, String cufe, Integer IdMovDoc) throws SQLException{
+    private void actualizarNotaMovimientos(Integer idDocXmlEnviadoDian, byte[] xmlBytes, byte[] qrBytes, String cude, Integer IdMovDoc) throws SQLException{
         
         String sqlUpdate = """
             UPDATE MovimientoDocumentos 
@@ -412,7 +454,7 @@ public class FelectronicaService {
             ps.setInt(2, idDocXmlEnviadoDian);
             ps.setBytes(3, xmlBytes);
             ps.setBytes(4, qrBytes);
-            ps.setString(5, cufe);
+            ps.setString(5, cude);
             ps.setInt(6, IdMovDoc);
             ps.executeUpdate();
         }
@@ -426,7 +468,7 @@ public class FelectronicaService {
      * @param xmlBytes    XML de respuesta en bytes.
      * @throws SQLException si ocurre un error al ejecutar el INSERT.
      */
-    private void insertarMovimientoFactura(Integer IdMovDoc, String erroresDian, byte[] xmlBytes) throws SQLException{
+    private void insertarMovimientoNota(Integer IdMovDoc, String erroresDian, byte[] xmlBytes) throws SQLException{
         String insertSql = "INSERT INTO MovimientoDocumentos_FE_Solicitudes (IdMovDoc, IdTipoSolicitud, FechaSolicitud, EstadoSolicitud, EstadoValidacion, DescripcionEstado, RespXml) VALUES (?, ?, GETDATE(), ?, ?, ?, ?)";
         try (Connection conn = DriverManager.getConnection(databaseConfig.getConnectionUrl("IPSoftFinanciero_ST"))){
             try(PreparedStatement ps = conn.prepareStatement(insertSql)){
@@ -492,7 +534,7 @@ public class FelectronicaService {
     @SuppressWarnings("null")
     private HttpHeaders construirHeaders(String bearerToken) {
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setContentType(new MediaType("application", "json", StandardCharsets.UTF_8));
         headers.setBearerAuth(bearerToken);
         headers.set("User-Agent", "PostmanRuntime/7.44.1");
         headers.set("Accept", "application/json");

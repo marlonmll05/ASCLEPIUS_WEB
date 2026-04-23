@@ -66,7 +66,7 @@ public class DatabaseConfig {
         try{
             String servidor = getServerFromRegistry();
 
-            return String.format("jdbc:sqlserver://%s;databaseName=%s;user=%s;password=%s;encrypt=true;trustServerCertificate=true;sslProtocol=TLSv1;", 
+            return String.format("jdbc:sqlserver://%s;databaseName=%s;user=%s;password=%s;encrypt=true;trustServerCertificate=true;sslProtocol=TLSv1;sendStringParametersAsUnicode=true;characterEncoding=UTF-8;",
                                 servidor, dbName, dbUsername, dbPassword);
         } catch(Exception e){
             throw new RuntimeException("Error al obtener URL de conexión: " + e.getMessage(), e);
