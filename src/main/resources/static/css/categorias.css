@@ -496,6 +496,9 @@ h3 {
     color: #111827;
 }
 
+.close {
+    cursor: pointer;
+}
 
 /* ===========================
 CHECKBOX

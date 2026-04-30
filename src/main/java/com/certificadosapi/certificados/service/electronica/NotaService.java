@@ -365,6 +365,8 @@ public class NotaService {
      */
     @SuppressWarnings("null")
     public void enviarCorreo(int IdMovDoc, String CorreoA, String CorreoCC, String CorreoCCO, String Url) throws Exception {
+
+        log.info("Preparando envío de correo para Nota. IdMovDoc={}, Destinatario={}, CC={}, CCO={}", IdMovDoc, CorreoA, CorreoCC, CorreoCCO);
         Map<String, String> mapContenido = obtenerNombreAsunto(IdMovDoc);
         String asunto        = mapContenido.get("asunto");
         String nombreArchivo = mapContenido.get("nombreArchivo");
